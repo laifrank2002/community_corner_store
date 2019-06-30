@@ -15,7 +15,7 @@ var UIHandler = (
 				ui = {};
 				ui["content"] = new UITabbedPanel(0,0,800,575);
 				
-				var reports_tab = new UIScrollPanel(0,0,800,550,2000);
+				var reports_tab = new UIScrollPanel(0,0,800,550,22000);
 				reports_tab.content_panel.addSubElement(new UILabel(100,100,"Hello World","left"),100,100);
 				reports_tab.content_panel.addSubElement(new UILabel(100,100,"More text to be lorem ipsum!","left"),100,120);
 				reports_tab.content_panel.addSubElement(new UILabel(100,100,"Hello World","left"),100,380);

@@ -21,7 +21,7 @@ function UIElement(x,y,width,height,type = "generic",onmouseclick = null)
 	this.parent = null;
 	this.hidden = false;
 }
-UIElement.prototype.indent_size = 3;
+UIElement.prototype.indent_size = 2;
 UIElement.prototype.default_colour = "#4f89e0";
 UIElement.prototype.darker_colour = "#125dcc";
 UIElement.prototype.lighter_colour = "#94bcf7";
@@ -474,8 +474,6 @@ UIScrollPanel.prototype.moveToScroll = function()
 	// then we can factor in SCROLL
 	this.content_panel.children.forEach(child => child.move(child.relative_x + this.x
 		,child.relative_y + this.y - scroll * this.max_height));
-		
-	console.log(scroll);
 }
 
 function UIScrollBar()
@@ -528,14 +526,17 @@ UIScrollBar.prototype.attach = function(panel)
 
 }
 
-UIScrollBar.prototype.scrollUp = function(amount = 0.1)
+// instead of amount, we'll be converting pixels to amount
+UIScrollBar.prototype.scrollUp = function(pixels = 100)
 {
+	var amount = (pixels/this.parent.max_height)
 	this.scrollComponent.scrollUp(amount);
 	if(this.parent) this.parent.moveToScroll();
 }
 
-UIScrollBar.prototype.scrollDown = function(amount = 0.1)
+UIScrollBar.prototype.scrollDown = function(pixels = 100)
 {
+	var amount = (pixels/this.parent.max_height)
 	this.scrollComponent.scrollDown(amount);
 	if(this.parent) this.parent.moveToScroll();
 }
@@ -549,6 +550,12 @@ UIScrollBar.prototype.setScroll = function(amount)
 UIScrollBar.prototype.getScroll = function()
 {
 	return this.scrollComponent.scroll;
+}
+
+UIScrollBar.prototype.performMouseScroll = function()
+{
+	this.parent.scroll = this.getScroll();
+	this.parent.moveToScroll();
 }
 
 function UIScrollBarComponent()
@@ -568,7 +575,7 @@ Object.defineProperty(UIScrollBarComponent.prototype, 'constructor', {
 	value: UIScrollBarComponent,
 	enumerable: false, // so that it does not appear in 'for in' loop
     writable: true });
-
+	
 UIScrollBarComponent.prototype.SCROLL_WIDTH = UIScrollPanel.prototype.SCROLL_WIDTH;
 UIScrollBarComponent.prototype.default_colour = UIScrollPanel.prototype.SCROLL_COLOUR;
 
@@ -605,7 +612,7 @@ UIScrollBarComponent.prototype.scrollDown = function(amount = 0.1)
 	this.bar.moveToScroll();
 	
 }
-/*
+
 UIScrollBarComponent.prototype.setScroll = function(amount)
 {
 	this.scroll = amount;
@@ -613,7 +620,20 @@ UIScrollBarComponent.prototype.setScroll = function(amount)
 	if(amount > 1) this.scroll = 1;
 	this.bar.moveToScroll();
 }
-*/
+// gets scroll from scroll bar position
+UIScrollBarComponent.prototype.getScrollFromBar = function()
+{
+	return (this.bar.y - this.y)/(this.height - this.bar_height);
+}
+
+// does a mouse scroll thing 
+// helps us in propagation up the line to its parent 
+UIScrollBarComponent.prototype.performMouseScroll = function()
+{
+	this.scroll = this.getScrollFromBar();
+	this.parent.performMouseScroll();
+}
+
 function UIScrollBarComponentBar()
 {
 	UIElement.call(this,0,0,this.SCROLL_WIDTH,0,"scroll_bar_component_bar");
@@ -639,6 +659,20 @@ UIScrollBarComponentBar.prototype.attach = function(scrollBar)
 UIScrollBarComponentBar.prototype.moveToScroll = function()
 {
 	this.y = this.parent.y + this.parent.scroll*(this.parent.height-this.parent.bar_height);
+}
+
+// going to cheat a little here, if mousedown then we'll also modify the y position
+UIScrollBarComponentBar.prototype.draw = function(context)
+{
+	UIElement.prototype.draw.call(this,context);
+	if(this.mousedown)
+	{
+		this.y = Engine.mouseY;
+		if(this.y < this.parent.y) this.y = this.parent.y;
+		if(this.y > this.parent.y + this.parent.height - this.parent.bar_height) this.y = this.parent.y + this.parent.height - this.parent.bar_height;
+		// affect everything ALL the way down the line 
+		this.parent.performMouseScroll();
+	}
 }
 
 
