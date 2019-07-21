@@ -2,6 +2,8 @@ var Engine = (
 	function()
 	{
 		var _log = true;
+		var _warn = true;
+		var _debug = false;
 		var lastTime = null;
 		var paused = true;
 		
@@ -15,8 +17,18 @@ var Engine = (
 		var settings = {};
 		
 		var mousePosition = {x:0, y:0};
+		var keysPressed = {
+			"up":false,	
+			"down":false,	
+			"left":false,	
+			"right":false,	
+		};
 		return {
+			get _debug() {return _debug;},
+			
 			get context() {return context;},
+			
+			get keysPressed() {return keysPressed;},
 			
 			get mouseX() {return mousePosition.x;},
 			get mouseY() {return mousePosition.y;},
@@ -38,11 +50,14 @@ var Engine = (
 				
 				// helper initializing
 				UIHandler.initialize();
-				
-				//
+				Shop.initialize();
+				// listeners
 				document.body.addEventListener("mousedown",Engine.handle_mousedown, false);
 				document.body.addEventListener("mouseup",Engine.handle_mouseup, false);
 				document.body.addEventListener("mousemove",Engine.handle_mousemove, false);
+				
+				document.body.addEventListener("keydown",Engine.handle_keydown, false);
+				document.body.addEventListener("keyup",Engine.handle_keyup, false);
 				
 				window.requestAnimationFrame(Engine.draw);
 			},
@@ -52,6 +67,14 @@ var Engine = (
 				if(_log)
 				{
 					console.log(message);
+				}
+			},
+			
+			warn: function(message)
+			{
+				if(_warn)
+				{
+					console.warn(message);
 				}
 			},
 			
@@ -95,6 +118,7 @@ var Engine = (
 			{
 				if(!paused)
 				{
+					Shop.tick(lapse);
 				}
 			},
 			
@@ -122,6 +146,52 @@ var Engine = (
 				mousePosition.x = mouseX;
 				mousePosition.y = mouseY;
 			},
+			
+			handle_keydown: function(keyevent)
+			{
+				switch(keyevent.keyCode)
+				{
+					case 37:
+					case 65:
+						keysPressed["left"] = true;
+						break;
+					case 39:
+					case 68:
+						keysPressed["right"] = true;
+						break;
+					case 40:
+					case 83:
+						keysPressed["down"] = true;
+						break;
+					case 38:
+					case 87:
+						keysPressed["up"] = true;
+						break;
+				}
+			},
+			
+			handle_keyup: function(keyevent)
+			{
+				switch(keyevent.keyCode)
+				{
+					case 37:
+					case 65:
+						keysPressed["left"] = false;
+						break;
+					case 39:
+					case 68:
+						keysPressed["right"] = false;
+						break;
+					case 40:
+					case 83:
+						keysPressed["down"] = false;
+						break;
+					case 38:
+					case 87:
+						keysPressed["up"] = false;
+						break;
+				}
+			},
 		}
 	}
 )();
@@ -144,4 +214,12 @@ Rectangle.prototype.isInBounds = function(x,y)
 {
 	if(x >= this.x && y >= this.y && x < this.x + this.width && y < this.y + this.height) return true;
 	return false;
+}
+
+function create_image(path) 
+{
+	var image = document.createElement("img");
+	image.src = path;
+
+	return image;
 }

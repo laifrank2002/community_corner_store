@@ -1,3 +1,15 @@
+/*
+	****UI Element Documentation****
+	function UIElement(x,y,width,height,type = "generic",onmouseclick = null)
+	
+	function UIButton (x,y,width,height,text,onmouseclick)
+	function UILabel (x,y,text, align = "center")
+	function UIImage (x,y,width,height,source)
+	function UIPanel (x,y,width,height)
+	function UITabbedPanel (x,y,width,height)
+	function UIScrollPanel (x,y,width,height,max_height)
+	
+ */
 /* 
 	UI Element 
 	X and Y are absolute within canvas 
@@ -32,6 +44,7 @@ UIElement.prototype.font_colour = "#ffffff";
 UIElement.prototype.draw = function(context)
 {
 	if(this.hidden) return false;
+	context.save();
 	/* draw self */
 	context.fillStyle = this.default_colour;
 	context.strokeStyle = this.darker_colour;
@@ -41,6 +54,8 @@ UIElement.prototype.draw = function(context)
 	context.rect(this.x, this.y, this.width, this.height);
 	context.closePath();
 	context.fill();
+	// we clip in order to prevent overlap onto other elements 
+	context.clip();
 	
 	if(this.paint) this.paint(context);
 	
@@ -50,6 +65,8 @@ UIElement.prototype.draw = function(context)
 		this.children.forEach(child =>
 			child.draw(context));
 	}
+	
+	context.restore();
 }
 
 UIElement.prototype.draw_borders = function(context)

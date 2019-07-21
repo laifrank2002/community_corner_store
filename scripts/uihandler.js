@@ -15,6 +15,9 @@ var UIHandler = (
 				ui = {};
 				ui["content"] = new UITabbedPanel(0,0,800,575);
 				
+				var shop_tab = ShopHandler;
+				ui["content"].addSubPanel("Shop",shop_tab);
+				
 				var reports_tab = new UIScrollPanel(0,0,800,550,22000);
 				reports_tab.content_panel.addSubElement(new UILabel(100,100,"Hello World","left"),100,100);
 				reports_tab.content_panel.addSubElement(new UILabel(100,100,"More text to be lorem ipsum!","left"),100,120);
@@ -23,6 +26,9 @@ var UIHandler = (
 								
 				var settings_tab = new UIPanel();
 				ui["content"].addSubPanel("Settings",settings_tab);
+				
+				ui["content"].hideAllTabs();
+				shop_tab.show();
 				
 				ui["bottom_bar"] = new UIPanel(0,575,800,25,"panel");
 				ui["bottom_bar"].addSubElement(new UILabel(0,575,"By Frank Lai","left"));
