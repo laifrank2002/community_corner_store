@@ -37,6 +37,7 @@ function UIElement(x,y,width,height,type = "generic",onmouseclick = null)
 }
 
 // defined colours and settings. THESE are what you CAN play around with.
+UIElement.prototype.line_width = 2;
 UIElement.prototype.indent_size = 2;
 UIElement.prototype.default_colour = "#4f89e0";
 UIElement.prototype.darker_colour = "#125dcc";
@@ -64,7 +65,7 @@ UIElement.prototype.draw = function(context)
 	/* draw self */
 	context.fillStyle = this.default_colour;
 	context.strokeStyle = this.darker_colour;
-	
+	context.lineWidth = this.line_width;
 	// standard
 	context.beginPath();
 	context.rect(this.x, this.y, this.width, this.height);
@@ -449,6 +450,7 @@ UILabel.prototype.setText = function(text)
 {
 	this.text = text;
 }
+
 // an image loader 
 function UIImage (width,height,source)
 {
@@ -1024,6 +1026,23 @@ UITitleBar.prototype.draw = function(context)
 	
 	UIElement.prototype.draw.call(this,context);
 	this.draw_borders(context);
+	
+	// yes, I know we called drawing TWICE
+	// but this is a specific case.
+	// if this ever causes problems down the line 
+	// KEYWORD
+	if(this.children)
+	{
+		this.children.forEach(child =>
+		{
+			if(child.type === "button")
+			{
+				// we redraw the menu buttons 
+				// they are clipped by the borders 
+				child.draw(context);
+			}
+		});
+	}
 	
 	// dragging!
 	if(this.draggable)

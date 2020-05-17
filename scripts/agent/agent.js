@@ -15,14 +15,18 @@ function Agent(width,height)
 	MapObject.call(this
 		,width
 		,height
-		,2);
-		
+		,10);
+	
+	this.type = "agent";
+	this.name = randomName() + " " + randomName();
+
 	this.floor = 0;
 	this.path = [];
 	this.target = null;
 		
 	this.actionQueue = [];
 	this.currentAction = null;
+	this.cooldown = 0;
 }
 
 Agent.prototype = Object.create(MapObject.prototype);
@@ -34,6 +38,10 @@ Object.defineProperty(Agent.prototype, 'constructor', {
 
 Agent.prototype.DEFAULT_SPEED = 0.5;
 Agent.prototype.DISTANCE_TOLERANCE = 15;
+
+Agent.prototype.DEFAULT_WIDTH = 32;
+Agent.prototype.DEFAULT_HEIGHT = 128;
+Agent.prototype.DEBUG_COLOUR = "#fafbff";
 
 Agent.prototype.tick = function(lapse)
 {
@@ -54,10 +62,27 @@ Agent.prototype.tick = function(lapse)
 	this.doCurrentAction(lapse);
 }
 
-Agent.prototype.think = function(lapse)
+// @override
+Agent.prototype.draw = function(context, x, y)
 {
+	if(!this.isDrawSafe()) return;
 	
+	context.fillStyle = this.DEBUG_COLOUR;
+	context.beginPath();
+	context.rect(this.x + x, this.y + y, this.width, this.height);
+	context.closePath();
+	context.stroke();
+		
+	context.fill();
+
+	// nameo
+	context.fillStyle = "black";
+	context.font = "12px Arial";
+	context.fillText(this.name,this.x + x, this.y + y - 10);
 }
+
+// safety, default behaviour IS to do nothing 
+Agent.prototype.think = function(lapse){}
 
 Agent.prototype.doCurrentAction = function(lapse)
 {
@@ -79,6 +104,15 @@ Agent.prototype.doCurrentAction = function(lapse)
 				// we're done, since without a target we're already there; no destination port no winds favourable and everything
 				this.currentAction = null;
 			}
+			break;
+		case "wait": 
+			this.cooldown -= lapse;
+			if(this.cooldown < 0) 
+			{
+				this.cooldown = 0;
+				this.currentAction = null;
+			}
+			
 			break;
 		default:
 			// default do nothing, in fact this shouldn't be here! 
@@ -192,3 +226,5 @@ Agent.prototype.spawn = function(x,y)
 	// spawn upright
 	this.y = y - this.height;
 }
+
+Agent.prototype.despawn = function() {}

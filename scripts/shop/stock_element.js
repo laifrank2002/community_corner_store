@@ -1,0 +1,1 @@
+var StockElement = new UIScrollPanel(0,0,800,525,600);

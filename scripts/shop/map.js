@@ -15,10 +15,12 @@ function Map(image, width, height, grid_width = Map.prototype.GRID_HORIZONTAL_WI
 	this.width = width;
 	this.height = height;
 	this.backgroundImage = image;
-	this.viewport = new Viewport(0,0,ShopHandler.width,ShopHandler.height);
+	this.viewport = new Viewport(0,0,ShopElement.width,ShopElement.height);
 	
 	this.grid = new GridMap(grid_width, grid_height);
 	this.objects = [];
+	// special...
+	this.particles = [];
 	
 	// SPECIAL OBJECTS 
 	// EXITS LEFT
@@ -29,7 +31,7 @@ function Map(image, width, height, grid_width = Map.prototype.GRID_HORIZONTAL_WI
 }
 
 Map.prototype.KEY_MOVEMENT_SPEED = 10;
-Map.prototype.GRID_STARTING_X = 128;
+Map.prototype.GRID_STARTING_X = 64;
 Map.prototype.GRID_STARTING_Y = 880;
 
 Map.prototype.GRID_HORIZONTAL_WIDTH = 21;
@@ -103,6 +105,16 @@ Map.prototype.removeObject = function(object)
 {
 	object.active = false;
 	this.objects = this.objects.filter(object => object.active);
+}
+
+Map.prototype.forEachObject = function(action)
+{
+	this.objects.forEach(action);
+}
+
+Map.prototype.filterObjects = function(filter)
+{
+	this.objects = this.objects.filter(filter);
 }
 
 Map.prototype.setViewportCoordinates = function(x,y)
@@ -353,7 +365,7 @@ GridMap.prototype.plopGridObject = function(object, x, y)
 		}
 	}
 	
-	var occupiedCoordinates = this.translateCoordinates(object.type.occupied, x, y);
+	var occupiedCoordinates = this.translateCoordinates(object.template.occupied, x, y);
 	var occupiedTiles = occupiedCoordinates.map(coordinate => this.getTile(coordinate.x,coordinate.y));
 	
 	if(this.isAllValidTile(occupiedTiles,(tile) => object.isValidTile(tile)))
@@ -517,6 +529,8 @@ function MapObject(width,height,z=0)
 	this.width = width;
 	this.height = height;
 	
+	this.type = "generic";
+	
 	this.zIndex = z;
 	
 	this.active = true;
@@ -618,6 +632,18 @@ MapObject.prototype.isInBounds = function(object)
 	return false;
 }
 
+MapObject.prototype.isCoordinateInBounds = function(x,y)
+{
+	if(x > this.x 
+		&& x < this.x + this.width 
+		&& y > this.y 
+		&& y < this.y + this.height)
+	{
+		return true;
+	}
+	return false;
+}
+
 MapObject.prototype.getObjectsInBounds = function(map)
 {
 	return map.objects.filter(object => this.isInBounds(object));
@@ -640,20 +666,22 @@ MapObject.prototype.getDistanceToObject = function(object)
 	Responsible for basic logic of furniture and such
 	Extend this to make business logic
  */
-function GridObject(type)
+function GridObject(template)
 {
-	this.type = type;
+	this.template = template;
 	MapObject.call(this
 		,this.getGridWidth() * Map.prototype.GRID_HORIZONTAL_SIZE
 		,this.getGridHeight() * Map.prototype.GRID_VERTICAL_SIZE
-		,1);
+		,5);
 		
+	this.type = "grid_generic";
+	
 	this.gridX = this.getGridX();
 	this.gridY = this.getGridY();
 	this.gridWidth = this.getGridWidth();
 	this.gridHeight = this.getGridHeight();
 	this.occupiedList = [];
-	this.image = this.type.image;
+	this.image = this.template.image;
 }
 
 GridObject.prototype = Object.create(MapObject.prototype);
@@ -662,23 +690,6 @@ Object.defineProperty(GridObject.prototype, 'constructor', {
 		enumerable: false,
 		writable: true
 	});
-	
-GridObject.prototype.types = {
-	"shelf": {
-		occupied: [{x:0,y:0},{x:1,y:0}],
-		image: images["shelf"],
-	},
-	"checkout_counter": {
-		occupied: [{x:0,y:0},{x:1,y:0},{x:2,y:0}],
-		image: images["checkout_counter"],
-	},
-	/*
-	"stairwell": {
-		occupied: [{x:0,y:0},{x:1,y:0},{x:2,y:0},{x:3,y:0}],
-		image: create_image("assets/stairwell.png"),
-	}
-	*/
-};
 
 /**
 	@overrides MapObject.prototype.draw(context,x,y)
@@ -701,12 +712,12 @@ GridObject.prototype.plop = function(x,y)
 
 /**
 	Used to determine if object is validly placed. 
-	If there is no function in GridObject.prototype.types[type]
+	If there is no function in GridObject.prototype.templates[this.template]
 	Uses default 
  */
 GridObject.prototype.isValidTile = function(tile)
 {
-	if(this.type.isValidTile) return this.type.isValidTile(tile);
+	if(this.template.isValidTile) return this.template.isValidTile(tile);
 	
 	if(!tile.occupied) return true;
 	return false;
@@ -728,14 +739,14 @@ GridObject.prototype.getGridY = function()
 
 GridObject.prototype.getGridWidth = function()
 {
-	var minimum = Math.min.apply(null, this.type.occupied.map((coordinate) => {return coordinate.x}));
-	var maximum = Math.max.apply(null, this.type.occupied.map((coordinate) => {return coordinate.x}));
+	var minimum = Math.min.apply(null, this.template.occupied.map((coordinate) => {return coordinate.x}));
+	var maximum = Math.max.apply(null, this.template.occupied.map((coordinate) => {return coordinate.x}));
 	return (maximum - minimum + 1);
 }
 
 GridObject.prototype.getGridHeight = function()
 {
-	var minimum = Math.min.apply(null, this.type.occupied.map((coordinate) => {return coordinate.y}));
-	var maximum = Math.max.apply(null, this.type.occupied.map((coordinate) => {return coordinate.y}));
+	var minimum = Math.min.apply(null, this.template.occupied.map((coordinate) => {return coordinate.y}));
+	var maximum = Math.max.apply(null, this.template.occupied.map((coordinate) => {return coordinate.y}));
 	return (maximum - minimum + 1);
 }

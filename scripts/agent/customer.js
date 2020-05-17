@@ -10,7 +10,7 @@
 	@author laifrank2002
 	@date 2020-04-15
  */
-function Customer()
+function Customer(traits = [])
 {
 	Agent.call(this 
 		,Customer.prototype.DEFAULT_WIDTH
@@ -18,9 +18,19 @@ function Customer()
 		
 	this.cart = [];
 	this.subtotal = 0;
-	this.budget = randomInteger(this.minimumBudget, this.maximumBudget);
-	
+	this.budget = 0;
+		
 	this.hasPaid = false;
+	this.isAtCheckout = false;
+	
+	this.repeat_rate = 0.30;
+	// a cart that works the other way. unfulfilled needs are BAD! 
+	this.needs = [];
+	// traits determine if we have a good customer.
+	this.traits = traits;
+	
+	this.wealth = 1;
+	this.calculateWealth();
 }
 
 Customer.prototype = Object.create(Agent.prototype);
@@ -30,22 +40,112 @@ Object.defineProperty(Customer.prototype, 'constructor', {
 		writable: true
 	});
 	
+Customer.prototype.TRAIT_DEFINITIONS = {
+	"student": {
+		"needs": [
+			{"key": "book", "chance": 0.2,"urgency": {min: 0.25, max: 0.4}},
+			{"key": "stationery", "chance": 0.5, "urgency": {min: 0.35, max: 0.55}},
+			{"key": "school_supplies", "chance": 0.6, "urgency": {min: 0.35, max: 0.5}},
+			{"key": "beer", "chance": 0.2, "urgency": {min: 0.15, max: 0.2}},
+		],
+		"wealth_modifier": -1,
+	},
+	"alcoholic": {
+		"needs": [
+			{"key": "beer", "chance": 0.6,"urgency": {min: 0.35, max: 0.6}},
+			{"key": "wine", "chance": 0.4,"urgency": {min: 0.55, max: 0.7}},
+			{"key": "hard_liquor", "chance": 0.3,"urgency": {min: 0.65, max: 0.85}},
+		],
+		"wealth_modifier": -1,
+	},
+	"smoker": {
+		"needs": [
+			{"key": "cigarettes", "chance": 0.95,"urgency": {min: 0.6, max: 0.95}},
+		],
+		"wealth_modifier": -1,
+	},
+	"stoner": {
+		"needs": [
+			{"key": "chips", "chance": 0.6,"urgency": {min: 0.85, max: 0.95}},
+			{"key": "candy", "chance": 0.4,"urgency": {min: 0.85, max: 0.95}},
+			{"key": "soda", "chance":0.6,"urgency": {min: 0.8, max: 0.95}},
+		],
+		"wealth_modifier": -1,
+	},
+	"gambler": {
+		"needs": [
+			{"key": "lottery_ticket", "chance": 1.0,"urgency": {min: 0.95, max: 1.00}},
+		],
+		"wealth_modifier": -1,
+	},
+	"business_owner": {
+		"needs": [
+			{"key": "phone", "chance": 0.08,"urgency": {min: 0.15, max: 0.20}},
+			{"key": "phone_accessories", "chance": 0.35,"urgency": {min: 0.15, max: 0.25}},
+			{"key": "stationery", "chance": 0.75,"urgency": {min: 0.75, max: 0.85}},
+		],
+		"wealth_modifier": +3,
+	},
+	"blue_collar": {
+		"needs": [
+			{"key": "canned_tuna", "chance": 0.55,"urgency": {min: 0.35, max: 0.40}},
+			{"key": "milk", "chance": 0.40,"urgency": {min: 0.55, max: 0.60}},
+			{"key": "eggs", "chance": 0.65,"urgency": {min: 0.55, max: 0.75}},
+			{"key": "flour", "chance": 0.35,"urgency": {min: 0.15, max: 0.65}},
+			{"key": "cooking_oil", "chance": 0.25,"urgency": {min: 0.25, max: 0.65}},
+			{"key": "vegetables", "chance": 0.55,"urgency": {min: 0.45, max: 0.65}},
+			{"key": "fruits", "chance": 0.50,"urgency": {min: 0.45, max: 0.65}},
+			{"key": "soda", "chance": 0.65,"urgency": {min: 0.45, max: 0.65}},
+			{"key": "snacks", "chance": 0.85,"urgency": {min: 0.15, max: 0.25}},
+			{"key": "candy", "chance": 0.85,"urgency": {min: 0.15, max: 0.35}},
+			{"key": "phone", "chance": 0.02,"urgency": {min: 0.15, max: 0.20}},
+			{"key": "phone_accessories", "chance": 0.10,"urgency": {min: 0.15, max: 0.25}},
+			{"key": "cough_medicine", "chance": 0.07,"urgency": {min: 0.35, max: 0.55}},
+			{"key": "beer", "chance": 0.3,"urgency": {min: 0.25, max: 0.3}},
+		],
+		"wealth_modifier": +1,
+	},
+	"white_collar": {
+		"needs": [
+			{"key": "canned_tuna", "chance": 0.25,"urgency": {min: 0.35, max: 0.40}},
+			{"key": "milk", "chance": 0.65,"urgency": {min: 0.55, max: 0.60}},
+			{"key": "eggs", "chance": 0.75,"urgency": {min: 0.55, max: 0.75}},
+			{"key": "flour", "chance": 0.35,"urgency": {min: 0.15, max: 0.65}},
+			{"key": "cooking_oil", "chance": 0.25,"urgency": {min: 0.25, max: 0.65}},
+			{"key": "vegetables", "chance": 0.65,"urgency": {min: 0.45, max: 0.65}},
+			{"key": "fruits", "chance": 0.80,"urgency": {min: 0.45, max: 0.65}},
+			{"key": "soda", "chance": 0.65,"urgency": {min: 0.45, max: 0.65}},
+			{"key": "snacks", "chance": 0.55,"urgency": {min: 0.15, max: 0.25}},
+			{"key": "candy", "chance": 0.55,"urgency": {min: 0.15, max: 0.35}},
+			{"key": "phone", "chance": 0.04,"urgency": {min: 0.15, max: 0.20}},
+			{"key": "phone_accessories", "chance": 0.25,"urgency": {min: 0.15, max: 0.25}},
+			{"key": "cough_medicine", "chance": 0.07,"urgency": {min: 0.35, max: 0.55}},
+		],
+		"wealth_modifier": +2,
+	},
+	"sick": {
+		"needs": [
+			{"key": "cough_medicine", "chance": 0.95,"urgency": {min: 0.75, max: 0.95}},
+		],
+		"wealth_modifier": +0,
+	},
+}
+	
 Customer.prototype.DEFAULT_WIDTH = 32;
 Customer.prototype.DEFAULT_HEIGHT = 128;
 
-Customer.prototype.budgetTolerance = 5;
-Customer.prototype.minimumBudget = 50;
-Customer.prototype.maximumBudget = 100;
+Customer.prototype.BUDGET_TOLERANCE = 500;
+Customer.prototype.DEFAULT_WEALTH = 1;
+Customer.prototype.DEFAULT_MINIMUM_BUDGET = 2000;
+Customer.prototype.DEFAULT_MAXIMUM_BUDGET = 10000;
 
-Customer.prototype.CUSTOMERS = {
-	
-};
+Customer.prototype.DEBUG_COLOUR = "#fefe01";
 
 Customer.prototype.think = function(lapse)
 {
 	if(!this.currentAction && this.actionQueue.length < 1)
 	{
-		if(this.subtotal + this.budgetTolerance > this.budget)
+		if(this.subtotal + this.BUDGET_TOLERANCE > this.budget)
 		{
 			if(Math.random() > 0.5)
 			{
@@ -58,7 +158,7 @@ Customer.prototype.think = function(lapse)
 		}
 		else 
 		{
-			if(Math.random() > 0.9)
+			if(Math.random() > 0.98)
 			{
 				this.queueAction("checkout");
 			}
@@ -67,6 +167,11 @@ Customer.prototype.think = function(lapse)
 				this.queueAction("browse");
 			}
 		}
+	}
+	
+	if(this.currentAction != "checkout")
+	{
+		this.isAtCheckout = false;
 	}
 }
 
@@ -127,7 +232,11 @@ Customer.prototype.doCurrentAction = function(lapse)
 			}
 			if(this.getDistanceToObject(this.target) < this.DISTANCE_TOLERANCE)
 			{
-				this.target.checkout(this);
+				if(!this.isAtCheckout)
+				{
+					this.target.checkout(this);
+					this.isAtCheckout = true;
+				}
 				// we wait until the counter has processed this customer, then we leave
 				if(this.hasPaid)
 				{
@@ -149,7 +258,7 @@ Customer.prototype.doCurrentAction = function(lapse)
 			{
 				this.currentAction = null;
 				// Now we DISAPPEAR!
-				Shop.leaveCustomer(this);
+				Shop.despawnCustomer(this);
 			}
 			else 
 			{
@@ -169,9 +278,9 @@ Customer.prototype.addToCart = function(item, price)
 	{
 		this.cart.push(item);
 		this.subtotal += price;
-		if(this.subtotal > this.budget)
+		if(this.subtotal * (1 + World.sales_tax) > this.budget)
 		{
-			Engine.log(`Customer has attempted to buy $${this.subtotal} worth of goods while having only $${this.budget} amount of money. God will conjure up the difference in the mean time, but he sure is pissed.`);
+			Engine.log(`Customer has attempted to buy ${this.subtotal} worth of goods with ${this.subtotal * World.sales_tax} while having only $${this.budget} amount of money. God will conjure up the difference in the mean time, but he sure is pissed.`);
 		}
 	}
 	else 
@@ -183,24 +292,107 @@ Customer.prototype.addToCart = function(item, price)
 Customer.prototype.buyFromShelf = function(shelf)
 {
 	var item = shelf.browse();
-	var price = shelf.getPrice() * (1.13);
+	var price = shelf.getPrice();
 	
-	if(price + this.subTotal < this.budget)
+	if(item)
 	{
-		var amount = shelf.takeItem(1);
-		// now apply HST 
-		this.addToCart(item, price);
+		if((price + this.subtotal) * (1 + World.sales_tax) < this.budget)
+		{
+			var amount = shelf.takeItem(1);
+			if(amount > 0)
+			{
+				// now apply HST and basically finalize transaction.
+				this.addToCart(item, price);
+				this.fulfillNeed(item);
+			}
+		}
 	}
 }
 
 Customer.prototype.browseShelf = function(shelf)
 {
 	var item = shelf.browse();
+	var price = shelf.price;
 	// buying logic, for now it's random.
-	if(Math.random() > 0.2)
+	if(Math.random() < this.determineBuyChance(item, price))
 	{
 		this.buyFromShelf(shelf);
 	}
+}
+
+Customer.prototype.determineBuyChance = function(item, price)
+{
+	var chance = 0.05;
+	// first, if we need the item, that's going to be a check. 
+	// impulse items are going to be a *need* for lower class customers.
+	if(this.hasNeedFor(item))
+	{
+		chance = 1.0;
+	}
+	
+	// now, if the price is too high, the customer will be angry
+	// then there are two factors at play 
+	// is it more than the world price?
+	// how rich are they that the money doesn't matter to them?
+	var worldPrice = World.prices[item.key].retail;
+	
+	if(price > worldPrice)
+	{
+		// if thou price it too much, do not expect people to pay for it.
+		var priceModifier = Math.min(Math.max(Math.abs((price-worldPrice))/worldPrice,0),1);
+		
+		// on the other hand, if the price is too low
+		// people don't care about $1.5 vs $2.0 bubblegum as opposed to $7.5 and $10 steaks.
+		var lowPriceModifier = gompertz(price,1,-1,-0.00015/(1+this.wealth));
+		
+		chance = chance * (1 - ((priceModifier) * (lowPriceModifier)));
+	}
+	
+	return chance;
+}
+
+Customer.prototype.hasNeedFor = function(item)
+{
+	for(var i = 0; i < this.needs.length; i++)
+	{
+		if(this.needs[i].key === item.key && !this.needs[i].fulfilled)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+Customer.prototype.fulfillNeed = function(item)
+{
+	this.needs.forEach( (need) => { if(need.key === item.key){need.fulfilled = true} } );
+}
+
+Customer.prototype.calculateWealth = function()
+{
+	this.wealth = this.DEFAULT_WEALTH;
+	
+	// sum up traits 
+	this.wealth += this.traits.reduce( (modifier, trait) => modifier + this.TRAIT_DEFINITIONS[trait].wealth_modifier, 0);
+	
+	// sanity check 
+	if(this.wealth < 0) this.wealth = 0;
+}
+
+Customer.prototype.generateNeeds = function()
+{
+	var needs = [];
+	this.traits.forEach( trait => 
+	{
+		this.TRAIT_DEFINITIONS[trait].needs.forEach ( need =>
+		{
+			if(Math.random() < need.chance)
+			{
+				needs.push( {key:need.key, urgency: randomNumber(need.urgency.min, need.urgency.max), fulfilled: false} );
+			}
+		});
+	});
+	return needs;
 }
 
 /**
@@ -210,13 +402,8 @@ Customer.prototype.checkout = function()
 {
 	if(!this.hasPaid)
 	{
-		var total = 0;
-		for(var item = 0; item < this.cart.length; item++)
-		{
-			total += this.cart[item].price;
-		}
 		this.hasPaid = true;
-		return total;
+		return this.subtotal;
 	}
 	return false;
 }
@@ -243,6 +430,11 @@ Customer.prototype.queueAction = function(actionName)
 			return true;
 			break;
 		case "checkout":
+			if(this.subtotal <= 0)
+			{
+				// why waste time?
+				return this.queueAction("leave");
+			}
 			this.target = Shop.getClosestCheckout(this.x,this.y);
 			if(!this.target) return false;
 			
@@ -258,4 +450,48 @@ Customer.prototype.queueAction = function(actionName)
 		default: 
 			Engine.log(`Attempted to add unrecognized action ${actionName}.`);
 	}
+}
+
+Customer.prototype.spawn = function(x,y)
+{
+	Agent.prototype.spawn.call(this,x,y);
+	
+	this.needs = this.generateNeeds();
+	
+	this.budget = randomInteger(this.DEFAULT_MINIMUM_BUDGET * (this.wealth * 0.1 + 1)
+		,this.DEFAULT_MAXIMUM_BUDGET * (this.wealth + 1));
+	/*
+		we need to add to the budget when it comes to fulfilling basic needs.
+		when a consumer buys a $500 phone and complains 
+		they don't have enough money, that's THEIR own darn fault.
+	 */
+	this.budget += this.needs.reduce( (sum, need) => sum + World.prices[need.key].retail, 0 );
+	
+	this.cart = [];
+	this.subtotal = 0;
+	
+	this.hasPaid = false;
+	this.isAtCheckout = false;
+}
+
+Customer.prototype.despawn = function()
+{
+	if(!this.hasPaid)
+	{
+		while(this.cart.length > 0)
+		{
+			Shop.returnStock(this.cart.shift().key,1);
+		}
+	}
+	
+	// we determine our satisfaction and how much it met our needs.
+	var satisfaction = 1;
+	satisfaction -= this.needs.reduce( (dissatisfaction, need) => need.fulfilled ? dissatisfaction : dissatisfaction + need.urgency, 0);
+	satisfaction = Math.max(satisfaction, 0);
+	
+	Engine.log(satisfaction);
+	Engine.log(this.needs);
+	
+	this.repeat_rate += (satisfaction - 0.5)/10;
+	this.repeat_rate = Math.min(Math.max(this.repeat_rate,0),1);
 }

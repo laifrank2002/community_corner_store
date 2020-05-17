@@ -51,8 +51,8 @@ var Engine = (
 				settings["notification"]["notify"] = true;
 				
 				// helper initializing
-				UIHandler.initialize();
 				State_manager.initialize();
+				UIHandler.initialize();
 				// listeners
 				document.body.addEventListener("mousedown",Engine.handle_mousedown, false);
 				document.body.addEventListener("mouseup",Engine.handle_mouseup, false);
@@ -158,6 +158,11 @@ var Engine = (
 			
 			handle_keydown: function(keyevent)
 			{
+				var key = keyevent.key;
+				if(key.length === 1 || key === "Backspace" || key === "Enter")
+				{
+					UIHandler.handle_keydown(key);
+				}
 				switch(keyevent.keyCode)
 				{
 					case 37:
@@ -181,6 +186,11 @@ var Engine = (
 			
 			handle_keyup: function(keyevent)
 			{
+				var key = keyevent.key;
+				if(key.length === 1 || key === "Backspace" || key === "Enter")
+				{
+					UIHandler.handle_keyup(key);
+				}
 				switch(keyevent.keyCode)
 				{
 					case 37:

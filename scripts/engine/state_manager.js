@@ -7,8 +7,25 @@
 var State_manager = (
 	function()
 	{
-		var categories = ["shop","player","settings"];
+		var categories = ["shop","player","world","community","statistics","settings"];
 		var data = {};
+		var listeners = [];
+		
+		function State_listener(name,category,id,action)
+		{
+			this.name = name;
+			this.category = category;
+			this.id = id;
+			this.action = action;
+		}
+		
+		State_listener.prototype.trigger = function(category,id,value)
+		{
+			if(category === this.category && id === this.id)
+			{
+				this.action(value);
+			}
+		}
 		
 		return {
 			get data() {return data},
@@ -25,7 +42,37 @@ var State_manager = (
 			// if there are no previous saves, population data with defaults.
 			start_new_game: function()
 			{
-				data["world"] = {}
+				data["player"] = {
+					"money": 1000*100,
+				};
+				data["shop"] = {
+					"map": new Map(create_image("assets/background1.png"),1600,1200,10,1),
+					"checkouts": [],
+					"shelves": [],
+					"employees": [],
+					"customers": [],
+					"stock": {},
+				};
+				data["world"] = World;
+				for(var key in items)
+				{
+					var item = items[key];
+					if(!World.prices[key])
+					{
+						World.prices[key] = {wholesale:item.buy_price.start
+							,retail:item.buy_price.start * 1.2 * (1+World.sales_tax)};
+					}
+				}
+				
+				data["statistics"] = 
+				{
+					"checkouts": 0,
+					"customers_left_without_buying": 0,
+					"total_sales_value": 0,
+					"total_sales_tax": 0,
+				};
+				
+				data["community"] = Community;
 			},
 			
 			set_state: function(category,id,value)
@@ -33,7 +80,7 @@ var State_manager = (
 				if(data[category])
 				{
 					data[category][id] = value;
-					listeners.forEach(listener => listener.trigger(category,id));
+					listeners.forEach(listener => listener.trigger(category,id,value));
 				}
 				else 
 				{
@@ -72,6 +119,22 @@ var State_manager = (
 				{
 					Engine.log("Get Data: No such category: " + category + " exists.");
 				}
+			},
+			
+			/**
+				Note, no two listeners should not have the same name. 
+			 */
+			add_listener: function(name,category,id,action)
+			{
+				listeners.push(new State_listener(name,category,id,action));
+			},
+			
+			/**
+				Note, fails silently 
+			 */
+			remove_listener: function(name)
+			{
+				listeners = listeners.filter(listener => listener.name !== name);
 			},
 			
 			export_data: function()
