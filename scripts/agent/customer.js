@@ -15,21 +15,26 @@ function Customer(traits = [])
 	Agent.call(this 
 		,Customer.prototype.DEFAULT_WIDTH
 		,Customer.prototype.DEFAULT_HEIGHT);
-		
+	
+	this.type = "customer";
+	
+	this.traits = traits;
+	
+	this.wealth = 1;
+	this.repeat_rate = 0.30;
+	// temp fields
 	this.cart = [];
 	this.subtotal = 0;
 	this.budget = 0;
 		
 	this.hasPaid = false;
 	this.isAtCheckout = false;
+	this.timeSpent = 0;
 	
-	this.repeat_rate = 0.30;
 	// a cart that works the other way. unfulfilled needs are BAD! 
 	this.needs = [];
 	// traits determine if we have a good customer.
-	this.traits = traits;
 	
-	this.wealth = 1;
 	this.calculateWealth();
 }
 
@@ -141,11 +146,46 @@ Customer.prototype.DEFAULT_MAXIMUM_BUDGET = 10000;
 
 Customer.prototype.DEBUG_COLOUR = "#fefe01";
 
+/**
+	Creates a data object with necessary fields.
+	Calls everything down the chain.
+	
+	@date 2020-05-21
+	@author laifrank2002
+	@return an object without the prototype that can be safely 
+		converted to a JSON stringy
+ */
+Customer.prototype.toData = function()
+{	
+	var data = {traits: this.traits
+		,wealth: this.wealth
+		,repeat_rate: this.repeat_rate};
+	Object.assign(data, Agent.prototype.toData.call(this));
+	return data;
+}
+
+/**
+	Takes a data object and assigns parameters all the way down.
+	
+	@date 2020-05-21
+	@author laifrank2002
+	@return whether or not the operation was successful
+ */
+Customer.prototype.fromData = function(data)
+{
+	this.traits = data.traits;
+	this.wealth = data.wealth;
+	this.repeat_rate = data.repeat_rate;
+	
+	this.calculateWealth();
+	return Agent.prototype.fromData.call(this,data);
+}
+
 Customer.prototype.think = function(lapse)
 {
 	if(!this.currentAction && this.actionQueue.length < 1)
 	{
-		if(this.subtotal + this.BUDGET_TOLERANCE > this.budget)
+		if(this.timeSpent > 20 * 1000)
 		{
 			if(Math.random() > 0.5)
 			{
@@ -158,13 +198,34 @@ Customer.prototype.think = function(lapse)
 		}
 		else 
 		{
-			if(Math.random() > 0.98)
+			if(this.hasNeed())
 			{
-				this.queueAction("checkout");
+				if(this.subtotal + this.BUDGET_TOLERANCE > this.budget)
+				{
+					if(Math.random() > 0.5)
+					{
+						this.queueAction("checkout");
+					}
+					else 
+					{
+						this.queueAction("browse");
+					}
+				}
+				else 
+				{
+					this.queueAction("browse");
+				}
 			}
 			else 
 			{
-				this.queueAction("browse");
+				if(Math.random() > 0.4)
+				{
+					this.queueAction("checkout");
+				}
+				else 
+				{
+					this.queueAction("browse");
+				}
 			}
 		}
 	}
@@ -270,13 +331,15 @@ Customer.prototype.doCurrentAction = function(lapse)
 			Engine.log(`Attempted to do unrecognized ${this.currentAction}.`);
 			this.currentAction = null;
 	}
+	
+	this.timeSpent += lapse;
 }
 
 Customer.prototype.addToCart = function(item, price)
 {
 	if(item)
 	{
-		this.cart.push(item);
+		this.cart.push({key: item.key, item: item, price: price});
 		this.subtotal += price;
 		if(this.subtotal * (1 + World.sales_tax) > this.budget)
 		{
@@ -340,14 +403,14 @@ Customer.prototype.determineBuyChance = function(item, price)
 	{
 		// if thou price it too much, do not expect people to pay for it.
 		var priceModifier = Math.min(Math.max(Math.abs((price-worldPrice))/worldPrice,0),1);
-		
+				
 		// on the other hand, if the price is too low
 		// people don't care about $1.5 vs $2.0 bubblegum as opposed to $7.5 and $10 steaks.
 		var lowPriceModifier = gompertz(price,1,-1,-0.00015/(1+this.wealth));
 		
 		chance = chance * (1 - ((priceModifier) * (lowPriceModifier)));
 	}
-	
+	// Engine.log("BC: " + chance);
 	return chance;
 }
 
@@ -356,6 +419,18 @@ Customer.prototype.hasNeedFor = function(item)
 	for(var i = 0; i < this.needs.length; i++)
 	{
 		if(this.needs[i].key === item.key && !this.needs[i].fulfilled)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+Customer.prototype.hasNeed = function()
+{
+	for(var i = 0; i < this.needs.length; i++)
+	{
+		if(!this.needs[i].fulfilled)
 		{
 			return true;
 		}
@@ -457,13 +532,15 @@ Customer.prototype.spawn = function(x,y)
 	Agent.prototype.spawn.call(this,x,y);
 	
 	this.needs = this.generateNeeds();
+	// sort by urgency
+	this.needs.sort( (a,b) => b.urgency - a.urgency );
 	
 	this.budget = randomInteger(this.DEFAULT_MINIMUM_BUDGET * (this.wealth * 0.1 + 1)
 		,this.DEFAULT_MAXIMUM_BUDGET * (this.wealth + 1));
 	/*
 		we need to add to the budget when it comes to fulfilling basic needs.
 		when a consumer buys a $500 phone and complains 
-		they don't have enough money, that's THEIR own darn fault.
+		that they don't have enough money, then that's THEIR own darn fault.
 	 */
 	this.budget += this.needs.reduce( (sum, need) => sum + World.prices[need.key].retail, 0 );
 	
@@ -472,6 +549,7 @@ Customer.prototype.spawn = function(x,y)
 	
 	this.hasPaid = false;
 	this.isAtCheckout = false;
+	this.timeSpent = 0;
 }
 
 Customer.prototype.despawn = function()
@@ -486,11 +564,11 @@ Customer.prototype.despawn = function()
 	
 	// we determine our satisfaction and how much it met our needs.
 	var satisfaction = 1;
-	satisfaction -= this.needs.reduce( (dissatisfaction, need) => need.fulfilled ? dissatisfaction : dissatisfaction + need.urgency, 0);
+	var dissatisfaction = this.needs.reduce( (dissatisfaction, need) => need.fulfilled ? dissatisfaction : dissatisfaction + need.urgency, 0);
+	satisfaction -= dissatisfaction;
 	satisfaction = Math.max(satisfaction, 0);
 	
-	Engine.log(satisfaction);
-	Engine.log(this.needs);
+	Engine.log(dissatisfaction);
 	
 	this.repeat_rate += (satisfaction - 0.5)/10;
 	this.repeat_rate = Math.min(Math.max(this.repeat_rate,0),1);

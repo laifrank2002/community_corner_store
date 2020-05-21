@@ -18,8 +18,10 @@ function Employee()
 		,Employee.prototype.DEFAULT_WIDTH
 		,Employee.prototype.DEFAULT_HEIGHT);
 	
-	this.salary = 0;
+	this.type = "employee";
 	
+	this.salary = this.DEFAULT_SALARY;
+	// temp fields
 	this.manned_station = null;
 }
 
@@ -33,7 +35,39 @@ Object.defineProperty(Employee.prototype, 'constructor', {
 Employee.prototype.DEFAULT_WIDTH = 32;
 Employee.prototype.DEFAULT_HEIGHT = 128;
 
+Employee.prototype.DEFAULT_SALARY = 100 * 100;
+
 Employee.prototype.DEBUG_COLOUR = "#5101fe";
+
+/**
+	Creates a data object with necessary fields.
+	Calls everything down the chain.
+	
+	@date 2020-05-21
+	@author laifrank2002
+	@return an object without the prototype that can be safely 
+		converted to a JSON stringy
+ */
+Employee.prototype.toData = function()
+{	
+	var data = {salary: this.salary};
+	Object.assign(data, Agent.prototype.toData.call(this));
+	return data;
+}
+
+/**
+	Takes a data object and assigns parameters all the way down.
+	
+	@date 2020-05-21
+	@author laifrank2002
+	@return whether or not the operation was successful
+ */
+Employee.prototype.fromData = function(data)
+{
+	this.salary = data.salary;
+	
+	return Agent.prototype.fromData.call(this,data);
+}
 
 Employee.prototype.think = function(lapse)
 {

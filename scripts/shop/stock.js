@@ -21,7 +21,7 @@ var Stock = (
 				
 				for(var key in items)
 				{
-					inventory[key] = {count: 0, average_cost: 0};
+					inventory[key] = {count: 0, average_cost: 0, target_count: 0};
 				}
 				
 				// now we initialize the displayer
@@ -132,16 +132,33 @@ var Stock = (
 				return item.average_cost;
 			},
 			
+			getTargetCount: function(key)
+			{
+				var item = Stock.getItem(key);
+				if(!item) return 0;
+				
+				return item.target_count;
+			},
+			
 			addCount: function(key, amount, cost = 0)
 			{
 				var item = Stock.getItem(key);
 				if(!item) return false;
 				
 				var count = amount;
+				if(count < 0) count = 0;
+				
+				// if count is 0, we do nothing
+				// prevent divide by zero errors 
+				// we seperate this from the <0 check to catch any cases where count specifically calls for adding 0 
+				// (say because we couldn't afford it)
+				if(count === 0) return count;
 				
 				item.average_cost = (item.average_cost * item.count + cost * count) / (item.count + count);
 				// sanity check 
-				if(item.average_cost === NaN) item.average_cost = 0;
+				// REMINDER, since 0 is autocast, when we set to 0 again it should do nothing.
+				// if using a different default value, be wary.
+				if(!item.averageCost) item.average_cost = 0;
 				
 				item.count += count;
 				
@@ -168,6 +185,23 @@ var Stock = (
 				return count;
 			},
 			
+			setTargetCount: function(key, amount)
+			{
+				var item = Stock.getItem(key);
+				if(!item) return false;
+				
+				var target_count = amount;
+				
+				if(target_count < 0) target_count = 0;
+				
+				item.target_count = target_count;
+				
+				// update gfx
+				Stock.updateDisplay(key);
+				
+				return target_count;
+			},
+			
 			// temp buying function for now 
 			// in the future, delegate to another module
 			// we can't buy things, remember, if it's during the shop day.
@@ -180,6 +214,8 @@ var Stock = (
 				}
 				
 				var buyingAmount = amount;
+				if(buyingAmount < 0) buyingAmount = 0;
+				
 				if(buyingAmount * buyingPrice > State_manager.get_state("player","money"))
 				{
 					var buyingAmount = Math.floor(State_manager.get_state("player","money") / buyingPrice);

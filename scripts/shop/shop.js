@@ -13,11 +13,6 @@ var Shop = (
 		var LENGTH_OF_DAY = 60000;
 		// fields
 		var map;
-		
-		var time_elapsed = 0;
-		
-		var newDayButton;
-		var palette_selected = null;
 				
 		var checkouts = [];
 		var shelves = [];
@@ -25,9 +20,21 @@ var Shop = (
 		var employees = [];
 		var customers = [];
 		
+		// these are NOT saved, and are typically temporary variables.
+		// UI
+		var newDayButton;
+		
 		var speed = 1;
 		var paused = true;
 		var day_in_progress = false;
+		var time_elapsed = 0;
+		
+		var build_mode = false;
+		var build_mode_item_selected = 0;
+		
+		// DEBUG
+		var autonewday = true; // leaving it on AFK to see what would happen
+		var autostock = true; // prototype for later feature
 		
 		return {
 			get map() {return map},
@@ -44,7 +51,7 @@ var Shop = (
 				customers = State_manager.get_state("shop","customers");
 				
 				// initialization
-				map = new Map(create_image("assets/background1.png"),1600,1200,24,1);
+				map = new Map(images["background1"],1600,1200,20,1);
 				map.setViewportCoordinates(STARTING_X, STARTING_Y);
 				
 				ShopElement.initialize();
@@ -62,18 +69,55 @@ var Shop = (
 				// quick testing 
 				var list = ["canned_tuna","milk","eggs","flour","cooking_oil","vegetables","fruits","soda","snacks","candy"];
 				
-				list.forEach( (item,index) =>
+				list.forEach( (key,index) =>
 				{
-					var shelf = new Shelf();
-					shelf.setItem(items[item]);
-					shelf.stock(15);
+					var shelf = new NarrowShelf();
+					shelf.setItem(items[key]);
+					shelf.stock(5);
 					
-					Shop.plopGridObject(shelf, 4 + index * 2, 0);
+					Shop.setTargetStock(key, 50);
+					
+					Shop.plopGridObject(shelf, 4 + index * 1, 0);
 				});
 				
 				Shop.plopGridObject(new CheckoutCounter(),1,0);
 				
 				// Shop.startNewDay();
+			},
+			
+			fromData: function(data)
+			{
+				// turns data into something useful
+				map = new Map();
+				map = map.fromData(data.map);
+				
+				employees = data.employees.map(datum => 
+				{
+					var employee = new Employee();
+					employee.fromData(datum);
+				});
+				customers = data.customers.map(datum => 
+				{
+					var customer = new Customer();
+					customer.fromData(datum);
+				});
+				
+				// we gotta refind our shelves and checkouts cause it turns out that JSON can't store references 
+				// we don't want bitwise copies of what SHOULD be the same thing. 
+				// then it's no longer useful and everything becomes difficult.
+				
+				checkouts = Shop.getFurnitureOfType(CheckoutCounter);
+				shelves = Shop.getFurnitureOfType(Shelf)
+			},
+			
+			toData: function()
+			{
+				// turns this into data
+				return {
+					map: map,
+					employees: employees,
+					customers: customers,
+				}
 			},
 			
 			startNewDay: function()
@@ -90,13 +134,31 @@ var Shop = (
 				}
 				
 				newDayButton.hide();
-				// wir respawn the employees 
+				// we respawn the employees 
 				employees.forEach(employee => 
 				map.spawnAgent(employee));
 				
-				paused = false;
+				Shop.unpause();
 				day_in_progress = true;
 				State_manager.add_state("world","day",1);
+				
+				// NOW we restock to target levels.
+				if(autostock)
+				{
+					Engine.log(`----AUTOSTOCK REPORT DAY ${World.day}----`);
+					for(var key in items)
+					{
+						var count = Stock.getCount(key);
+						var target = Stock.getTargetCount(key);
+						
+						if(count < target) 
+						{
+							var amount = Stock.buyItem(key, target-count, World.prices[key].wholesale);
+							
+							Engine.log(`Autobought ${amount} units of ${key}.`);
+						}
+					}
+				}
 			},
 			
 			endDay: function()
@@ -109,7 +171,7 @@ var Shop = (
 				
 				map.forEachObject(object =>
 				{
-					if(object.type === "furniture")
+					if(object instanceof Furniture)
 					{
 						object.endDay();
 					}
@@ -117,22 +179,43 @@ var Shop = (
 				
 				// everybody leaves for the night 
 				Shop.despawnAgents();
-				paused = true;
+				Shop.pause();
 				day_in_progress = false;
 				
 				// now we run payroll
+				employees.forEach(employee => State_manager.add_state("player","money",-employee.salary));
 				
-				
-				newDayButton.show();
+				if(autonewday)
+				{
+					Shop.startNewDay();
+				}
+				else 
+				{
+					newDayButton.show();
+				}
+			},
+			
+			pause: function()
+			{
+				paused = true;
+			},
+			
+			unpause: function()
+			{
+				paused = false;
+			},
+			
+			togglePause: function()
+			{
+				paused = !paused;
 			},
 		
 			spawnCustomer: function(customer)
 			{
 				map.spawnAgent(customer);
 			},
-			// NOT the despawn agent function 
-			// this is used when a customer CONVENTIONALLY leaves the store 
-			// as in, has completed purchase and everything.
+			// this is used when a customer leaves the store 
+			// and has completed purchase and everything.
 			despawnCustomer: function(customer)
 			{
 				map.removeObject(customer);
@@ -149,10 +232,14 @@ var Shop = (
 					// now we must perform its effects
 					customer.cart.forEach(item =>
 					{
-						for(var key in item.effects)
+						for(var key in item.item.effects)
 						{
-							State_manager.add_state("community",key,item.effects[key]);
+							State_manager.add_state("community",key,item.item.effects[key]);
 						}
+						
+						// and stats!
+						State_manager.add_state("statistics",`total_${item.key}_sales_value`,item.price);
+						State_manager.add_state("statistics",`total_${item.key}_sales_count`,1);
 					});
 				}
 				customer.despawn();
@@ -162,8 +249,12 @@ var Shop = (
 			{
 				map.filterObjects(object => 
 				{
-					if(object.type === "agent") 
+					if(object instanceof Agent) 
 					{
+						if(object instanceof Customer)
+						{
+							if(!object.hasPaid) State_manager.add_state("statistics","customers_left_without_buying",1);
+						}
 						object.despawn();
 						return false;
 					}
@@ -205,7 +296,10 @@ var Shop = (
 				}
 				
 				// temp spawn algorithmn
-				if(Math.random() < 0.01) map.spawnAgent(Shop.generateCustomer());
+				if(time_elapsed/LENGTH_OF_DAY < 0.7)
+				{
+					if(Math.random() < 0.01) map.spawnAgent(Shop.generateCustomer());
+				}
 			},
 			
 			getClosestCheckout: function(x,y)
@@ -283,9 +377,25 @@ var Shop = (
 				return map.exit_left;
 			},
 			
+			getFurnitureOfType: function(type)
+			{
+				var list = [];
+				map.forEachObject(object =>
+				{
+					if(object instanceof type)
+					{
+						list.push(object);
+					}
+				});
+				
+				return list;
+			},
+			
 			// returns the last (newest) object which is within coordinates (x,y)
 			getObjectAt: function(x,y)
 			{
+				if(!map) return null;
+				
 				var selected = null;
 				map.forEachObject(object =>
 				{
@@ -369,6 +479,11 @@ var Shop = (
 			removeStock: function(key, amount)
 			{
 				return Stock.removeCount(key, amount);
+			},
+			
+			setTargetStock: function(key, amount)
+			{
+				return Stock.setTargetCount(key, amount);
 			},
 		}
 	}

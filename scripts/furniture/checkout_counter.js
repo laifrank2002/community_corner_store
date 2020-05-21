@@ -4,6 +4,7 @@
 function CheckoutCounter()
 {
 	Furniture.call(this,this.template);
+	this.type = "checkout_counter";
 	
 	this.employee = null;
 	
@@ -18,8 +19,6 @@ function CheckoutCounter()
 	this.totalSalesTaxPaid = 0;
 	
 	// daily stats 
-	
-	
 }
 
 CheckoutCounter.prototype = Object.create(Furniture.prototype);
@@ -30,6 +29,7 @@ Object.defineProperty(CheckoutCounter.prototype, 'constructor', {
 	});
 	
 CheckoutCounter.prototype.template = {
+	key: "checkout_counter",
 	name: "Checkout Counter",
 	occupied: [{x:0,y:0},{x:1,y:0},{x:2,y:0}],
 	image: images["checkout_counter"],
@@ -65,6 +65,40 @@ CheckoutCounter.prototype.actions = {
 		},
 	},
 };
+
+/**
+	Creates a data object with necessary fields.
+	Calls everything down the chain.
+	
+	@date 2020-05-21
+	@author laifrank2002
+	@return an object without the prototype that can be safely 
+		converted to a JSON stringy
+ */
+CheckoutCounter.prototype.toData = function()
+{	
+	var data = {customersProcessedCount: this.customersProcessedCount
+		,totalValueOfTransactions: this.totalValueOfTransactions
+		,totalSalesTaxPaid: this.totalSalesTaxPaid};
+	Object.assign(data, Furniture.prototype.toData.call(this));
+	return data;
+}
+
+/**
+	Takes a data object and assigns parameters all the way down.
+	
+	@date 2020-05-21
+	@author laifrank2002
+	@return whether or not the operation was successful
+ */
+CheckoutCounter.prototype.fromData = function(data)
+{
+	this.customersProcessedCount = data.customersProcessedCount;
+	this.totalValueOfTransactions = data.totalValueOfTransactions;
+	this.totalSalesTaxPaid = data.totalSalesTaxPaid;
+	
+	return Furniture.prototype.fromData.call(this,data);
+}
 
 CheckoutCounter.prototype.tick = function(lapse)
 {	

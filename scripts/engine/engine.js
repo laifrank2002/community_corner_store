@@ -8,7 +8,7 @@ var Engine = (
 		
 		var _log = true;
 		var _warn = true;
-		var _debug = false;
+		var _debug = true;
 		var lastTime = null;
 		var paused = true;
 		
@@ -53,6 +53,10 @@ var Engine = (
 				// helper initializing
 				State_manager.initialize();
 				UIHandler.initialize();
+				
+				// add the tests!
+				AddMapTests();
+				
 				// listeners
 				document.body.addEventListener("mousedown",Engine.handle_mousedown, false);
 				document.body.addEventListener("mouseup",Engine.handle_mouseup, false);
@@ -60,6 +64,12 @@ var Engine = (
 				
 				document.body.addEventListener("keydown",Engine.handle_keydown, false);
 				document.body.addEventListener("keyup",Engine.handle_keyup, false);
+				
+				if(_debug)
+				{
+					Engine.log("Debug mode enabled!");
+					TestingManager.runTests();
+				}
 				
 				window.requestAnimationFrame(Engine.draw);
 			},

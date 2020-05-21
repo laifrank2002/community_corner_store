@@ -93,7 +93,15 @@ ShopInspectWindow.initialize = function()
 	// customers 
 	this.customerDisplay = {
 			display: new UIPanel(null, null, this.width, this.content_panel.height - 25),
+			budget: new UILabel(`Budget: `, "left"),
+			cart: new UILabel(`Cart: `, "left"),
+			needs: new UILabel(`Needs: `, "left"),
 		}
+	this.customerDisplay.display.addSubElement(this.customerDisplay.budget,25,25);
+	this.customerDisplay.display.addSubElement(this.customerDisplay.cart,25,50);
+	this.customerDisplay.display.addSubElement(this.customerDisplay.needs,25,75);
+	this.addSubElement(this.customerDisplay.display,0,0);
+	
 }
 
 /**
@@ -106,11 +114,11 @@ ShopInspectWindow.prepare = function(object)
 	
 	this.selectedObject = object;
 	
-	if(object.type === "furniture")
+	if(object instanceof Furniture)
 	{
 		this.setTitle(object.template.name);
 	}
-	else if(object.type === "agent")
+	else if(object instanceof Agent)
 	{
 		this.setTitle(object.name);
 	}
@@ -149,7 +157,10 @@ ShopInspectWindow.update = function()
 	}
 	else if(object instanceof Customer)
 	{
-		
+		this.customerDisplay.budget.setText(`Budget: ${toCurrencyDisplayString(object.budget)}`);
+		this.customerDisplay.cart.setText(`Cart: ${object.cart.reduce( (text, item, index, array) => text + (index > 0 ? "," : "") + item.item.name, "")}`);
+		this.customerDisplay.needs.setText(`Needs: ${object.needs.reduce( (text, item, index, array) => text + (index > 0 ? "," : "") + items[item.key].name, "")}`);
+		this.customerDisplay.display.show();
 	}
 }
 
@@ -157,4 +168,5 @@ ShopInspectWindow.hideDisplays = function()
 {
 	this.shelfDisplay.display.hide();
 	this.checkoutCounterDisplay.display.hide();
+	this.customerDisplay.display.hide();
 }

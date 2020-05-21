@@ -72,6 +72,12 @@ var State_manager = (
 					"total_sales_tax": 0,
 				};
 				
+				for(var key in items)
+				{
+					data["statistics"][`total_${key}_sales_value`] = 0;
+					data["statistics"][`total_${key}_sales_count`] = 0;
+				}
+				
 				data["community"] = Community;
 			},
 			

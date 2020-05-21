@@ -1,0 +1,23 @@
+changelog 0.1.1
+- refactored map.js
+	- decomposed it into separate pieces
+		- map.js
+		- viewport.js
+		- grid.js (renamed from GridMap)
+		- grid_object.js 
+		- map_object.js 
+- added fromData and toData to
+	- map_object.js 
+	- grid.js
+	- grid_object.js
+	- map.js (note to self, add a universal object converter one day...)
+	- furniture.js 
+	- checkout_counter.js 
+	- shelf.js 
+	- narrow_shelf.js 
+	- agent.js 
+	- customer.js 
+	- employee.js
+- refactored grid.js (I've never seen so many circular references in my life!)
+- added testing!
+	- added two new comparators: assertObjectEquals and assertObjectDeepEquals

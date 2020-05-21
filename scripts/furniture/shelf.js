@@ -7,6 +7,7 @@
 function Shelf()
 {
 	Furniture.call(this,this.template);
+	this.type = "shelf";
 	
 	this.item = null;
 	this.price = 0;
@@ -27,6 +28,7 @@ Object.defineProperty(Shelf.prototype, 'constructor', {
 	});
 
 Shelf.prototype.template = {
+	key: "shelf",
 	name: "Shelf",
 	occupied: [{x:0,y:0},{x:1,y:0}],
 	image: images["shelf"],
@@ -35,7 +37,51 @@ Shelf.prototype.template = {
 		"stocked": images["shelf_stocked"],
 	},
 };
-Shelf.prototype.DEFAULT_CAPACITY = 15;
+Shelf.prototype.DEFAULT_CAPACITY = 20;
+
+/**
+	Creates a data object with necessary fields.
+	Calls everything down the chain.
+	
+	@date 2020-05-21
+	@author laifrank2002
+	@return an object without the prototype that can be safely 
+		converted to a JSON stringy
+ */
+Shelf.prototype.toData = function()
+{	
+	var itemKey = this.item ? this.item.key : "";
+	var data = {itemKey: this.item.key
+		,price: this.price 
+		,count: this.count
+		,capacity: this.capacity
+		,itemTakenCount: this.itemTakenCount
+		,stockable: this.stockable};
+	Object.assign(data, Furniture.prototype.toData.call(this));
+	return data;
+}
+
+/**
+	Takes a data object and assigns parameters all the way down.
+	
+	@date 2020-05-21
+	@author laifrank2002
+	@return whether or not the operation was successful
+ */
+Shelf.prototype.fromData = function(data)
+{
+	// in case the shelf actually has no item set (it's possible.)
+	this.item = data.itemKey === "" ? items[data.itemKey] : null; 
+	if(!this.item) Engine.log(`Shelf.fromData() cannot find item of key ${data.itemKey}.`);
+	
+	this.price = data.price;
+	this.count = data.count;
+	this.capacity = data.capacity;
+	this.itemTakenCount = data.itemTakenCount;
+	this.stockable = data.stockable;
+	
+	return Furniture.prototype.fromData.call(this,data);
+}
 
 Shelf.prototype.draw = function(context,x,y)
 {
