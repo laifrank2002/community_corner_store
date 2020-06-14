@@ -10,9 +10,11 @@
 	
 	function UIButton (width,height,text,onmouseclick)
 	function UILabel (text, align = "center")
-	function UIImage (width,height,source,image_smoothing = false)
+	function UIImage (width,height,source,image_resizing = "fit")
 	function UITextField(width,height,validate)
 	function UITextArea(width,height,text)
+	function UITable(width, height, rows = 1, columns = 1)
+	function UIComboBox(width,height,choices,onselect)
 	
  */
 /** 
@@ -80,9 +82,6 @@ UIElement.prototype.draw = function(context)
 	{
 		var elements_to_draw = [...this.children].reverse();
 		elements_to_draw.forEach(element => element.draw(context));
-		// draw children
-		//this.children.forEach(child =>
-		//	child.draw(context));
 	}
 	
 	context.restore();
@@ -277,8 +276,8 @@ UIElement.prototype.handle_mouseup = function(mouseX, mouseY)
 	}
 	if(this.isInBounds(mouseX,mouseY) && this.mousedown)
 	{
-		this.focus();
 		if(this.onmouseclick) this.onmouseclick(mouseX,mouseY);
+		this.focus();
 	}
 	else 
 	{
@@ -329,6 +328,25 @@ UIElement.prototype.handle_keyup = function(character)
 	return true;
 }
 
+UIElement.prototype.handle_wheel = function(deltaY)
+{
+	if(this.children)
+	{
+		// a good ol' fashion for loop to prevent propagation errors
+		for(var index = 0; index < this.children.length; index++)
+		{
+			var child = this.children[index];
+			child.handle_wheel(deltaY);
+		}
+	}
+	
+	if(this.onwheel)
+	{
+		this.onwheel(deltaY);
+	}
+	return true;
+}
+
 UIElement.prototype.addSubElement = function(element, x=0, y=0)
 {
 	if(element.parent) element.parent.removeSubElement(element);
@@ -354,6 +372,47 @@ UIElement.prototype.removeAllSubElements = function()
 	return true;
 }
 
+UIElement.prototype.isSubElementFocused = function()
+{
+	if(this.children)
+	{
+		// a good ol' fashion for loop to prevent propagation errors
+		for(var index = 0; index < this.children.length; index++)
+		{
+			var child = this.children[index];
+			if(child.isSubElementFocused()) return true;
+		}
+	}
+	
+	if(this.focused) return true;
+	
+	return false;
+}
+
+/*
+	Working with scroll panels...
+ */
+UIElement.prototype.isSubElementNotScrollableFocused = function()
+{
+	if(this.children)
+	{
+		// a good ol' fashion for loop to prevent propagation errors
+		for(var index = 0; index < this.children.length; index++)
+		{
+			var child = this.children[index];
+			if(child.isSubElementNotScrollableFocused()) return true;
+		}
+	}
+	
+	if(this.focused)
+	{
+		if(this.scrollable) return false;
+		return true;
+	}
+	
+	return false;
+}
+
 UIElement.prototype.hide = function()
 {
 	this.hidden = true;
@@ -367,7 +426,7 @@ UIElement.prototype.show = function()
 }
 
 UIElement.prototype.focus = function()
-{
+{	
 	this.focused = true;
 }
 
@@ -407,7 +466,6 @@ UIButton.prototype.draw = function(context)
 	if(this.mousedown)
 	{
 		this.draw_concave_indents(context);
-		
 	}
 	else 
 	{
@@ -452,10 +510,11 @@ UILabel.prototype.setText = function(text)
 }
 
 // an image loader 
-function UIImage (width,height,source)
+function UIImage (width,height,source, image_resizing = "fit")
 {
 	UIElement.call(this,null,null,width,height,"image");
 	
+	this.image_resizing = image_resizing;
 	if(typeof source === "object")
 	{
 		this.image = source;
@@ -484,7 +543,18 @@ UIImage.prototype.draw = function(context)
 		// try to render 
 		try 
 		{
-			context.drawImage(this.image,this.x,this.y,this.width,this.height);
+			switch(this.image_resizing)
+			{
+				case "horizontal": 
+					context.drawImage(this.image,this.x,this.y,this.width,(this.width/this.image.width)*this.image.height);
+					break;
+				case "vertical":
+					context.drawImage(this.image,this.x,this.y,(this.height/this.image.height)*this.image.width,this.height);
+					break;
+				case "fit":
+				default:	
+					context.drawImage(this.image,this.x,this.y,this.width,this.height);
+			}
 		}
 		catch(exception)
 		{
@@ -564,7 +634,7 @@ Object.defineProperty(UITabbedPanel.prototype, 'constructor', {
 UITabbedPanel.prototype.TAB_HEIGHT = 25;
 UITabbedPanel.prototype.TAB_WIDTH = 100;
 
-UITabbedPanel.prototype.addSubPanel = function(name,panel)
+UITabbedPanel.prototype.addSubPanel = function(name,panel,onopen)
 {
 	// add a tab to the tabbed pane
 	var previousButtonCount = this.tab_bar.children.length;
@@ -573,6 +643,8 @@ UITabbedPanel.prototype.addSubPanel = function(name,panel)
 		{
 			this.hideAllTabs();
 			this.content_panel.children[previousButtonCount].show();
+			
+			if(onopen) onopen();
 		});
 	this.tab_bar.addSubElement(tabButton
 		,this.x + previousButtonCount * this.TAB_WIDTH
@@ -594,8 +666,9 @@ UITabbedPanel.prototype.hideAllTabs = function()
 function UIScrollPanel (x,y,width,height,max_height)
 {
 	UIElement.call(this,x,y,width,height,"scroll_panel");
+	this.scrollable = true;
 	
-	if(max_height < this.height)
+	if(max_height < this.height || !max_height)
 	{
 		this.max_height = this.height + 1;
 	}
@@ -625,10 +698,9 @@ UIScrollPanel.prototype.SCROLL_COLOUR = UIElement.prototype.scroll_bar_backgroun
 
 UIScrollPanel.prototype.setPosition = function(x,y)
 {
-	this.x = x;
-	this.y = y;
-	this.content_panel.setPosition(x,y);
-	this.scroll_bar.attach(this);
+	UIElement.prototype.setPosition.call(this,x,y);
+	// because they are all temp positions, we need to recalculate the scroll offsets.
+	this.moveToScroll();
 }
 
 UIScrollPanel.prototype.resize = function(width,height)
@@ -680,6 +752,38 @@ UIScrollPanel.prototype.moveToScroll = function()
 		,child.relative_y + this.y - scroll * (this.max_height - this.height)));
 }
 
+UIScrollPanel.prototype.handle_wheel = function(deltaY)
+{
+	if(this.children)
+	{
+		// a good ol' fashion for loop to prevent propagation errors
+		for(var index = 0; index < this.children.length; index++)
+		{
+			var child = this.children[index];
+			child.handle_wheel(deltaY);
+		}
+	}
+	
+	if(this.onwheel)
+	{
+		this.onwheel(deltaY);
+	}
+	
+	if(this.isSubElementNotScrollableFocused())
+	{
+		if(deltaY < 0) 
+		{
+			this.scroll_bar.scrollUp(-deltaY);
+		}
+		else 
+		{
+			this.scroll_bar.scrollDown(deltaY);
+		}
+	}
+	
+	return true;
+}
+
 function UIScrollBar()
 {
 	UIElement.call(this,0,0,this.SCROLL_WIDTH,0,"scroll_bar");
@@ -688,9 +792,31 @@ function UIScrollBar()
 		
 	// add the top and bottom buttons 
 	this.topButton = new UIButton(this.SCROLL_WIDTH,this.SCROLL_WIDTH, "", ()=>this.scrollUp());
+	this.topButton.paint = function(context,x,y)
+	{
+		UIDrawer.draw_arrow(context
+			,x + this.indent_size * 3
+			,y + this.indent_size * 2 + Math.round((this.height - this.indent_size * 4) / 4)
+			,this.width - this.indent_size * 6
+			,Math.round((this.height - this.indent_size * 4) / 2)
+			,"north");
+		context.fill();
+		context.stroke();
+	}
 	this.addSubElement(this.topButton);
 	
 	this.bottomButton = new UIButton(this.SCROLL_WIDTH, this.SCROLL_WIDTH, "", ()=>this.scrollDown());
+	this.bottomButton.paint = function(context,x,y)
+	{
+		UIDrawer.draw_arrow(context
+			,x + this.indent_size * 3
+			,y + this.indent_size * 2 + Math.round((this.height - this.indent_size * 4) / 4)
+			,this.width - this.indent_size * 6
+			,Math.round((this.height - this.indent_size * 4) / 2)
+			,"south");
+		context.fill();
+		context.stroke();
+	}
 	this.addSubElement(this.bottomButton);
 	
 	// add the middle section
@@ -717,10 +843,8 @@ UIScrollBar.prototype.draw = function(context)
 UIScrollBar.prototype.attach = function(panel)
 {
 	this.parent = panel;
+	this.setRelativePosition(this.parent.width - this.SCROLL_WIDTH,0);
 	
-	this.x = this.parent.x + this.parent.width - this.SCROLL_WIDTH;
-	this.y = this.parent.y;
-		
 	this.width = this.SCROLL_WIDTH;
 	this.height = this.parent.height;
 	// change children 
@@ -787,8 +911,7 @@ UIScrollBarComponent.prototype.attach = function(scrollBar)
 {
 	this.parent = scrollBar;
 	
-	this.x = scrollBar.x;
-	this.y = scrollBar.y + scrollBar.SCROLL_WIDTH;
+	this.setRelativePosition(0,scrollBar.SCROLL_WIDTH);
 	this.width = scrollBar.SCROLL_WIDTH;
 		
 	// minus twice, once for top and once for bottom 
@@ -857,9 +980,15 @@ UIScrollBarComponentBar.prototype.indent_size = 4;
 UIScrollBarComponentBar.prototype.attach = function(scrollBar)
 {
 	this.parent = scrollBar;
-	this.x = this.parent.x;
-	this.y = this.parent.y + this.parent.scroll*(this.parent.height-this.parent.bar_height);
+	this.setRelativePosition(0,this.parent.scroll*(this.parent.height-this.parent.bar_height));
 	this.height = this.parent.bar_height;
+}
+
+UIScrollBarComponentBar.prototype.setPosition = function(x,y)
+{
+	UIElement.prototype.setPosition.call(this,x,y);
+	// we must recalculate our temporary scroll offset
+	this.moveToScroll();
 }
 
 UIScrollBarComponentBar.prototype.moveToScroll = function()
@@ -962,6 +1091,12 @@ UIWindow.prototype.setTitle = function(text)
 	if(text !== null) this.title_bar.setTitle(text);
 }
 
+UIWindow.prototype.hide = function()
+{
+	UIElement.prototype.hide.call(this);
+	if(this.parent) this.parent.focus(); // currently broken because of logic order
+}
+
 /**
 	MENUBUTTONS
 		QUIT (That's basically it)
@@ -985,20 +1120,7 @@ function UITitleBar(text = "",draggable,menuButton = false)
 		this.quit_button.lighter_colour = UIElement.prototype.title_quit_button_lighter_colour;
 		this.quit_button.paint = function(context,x,y)
 		{
-			context.beginPath();
-			context.moveTo(x+9,y+5);
-			context.lineTo(x+5,y+9);
-			context.lineTo(x+9,y+13);
-			context.lineTo(x+5,y+17);
-			context.lineTo(x+9,y+21);
-			context.lineTo(x+13,y+17);
-			context.lineTo(x+17,y+21);
-			context.lineTo(x+21,y+17);
-			context.lineTo(x+17,y+13);
-			context.lineTo(x+21,y+9);
-			context.lineTo(x+17,y+5);
-			context.lineTo(x+13,y+9);
-			context.closePath();
+			UIDrawer.draw_diagonal_cross(context,x+5,y+5,16,16);
 			context.fill();
 			context.stroke();
 		}
@@ -1310,8 +1432,7 @@ UITextField.prototype.type_character = function(character)
 
 /**
 	A pure TEXT table to speed up processing.
-	There are no elements within; why the hell do you need things in Tables? That's LAYOUT, and that shouldn't be done using a frickin' table!
-	Will have no children.
+	There are no elements within; Will have no children.
  */
 function UITable(width, height, rows = 1, columns = 1)
 {
@@ -1417,6 +1538,196 @@ UITable.prototype.set_column_weight = function(column,weight)
 	this.column_weights.setWeight(column,weight);
 }
 
+/**
+	UI Combobox allows us to select things easily 
+	(that's what they said about buttons too).
+ */
+function UIComboBox(width,height,choices,onselect)
+{
+	UIElement.call(this,null,null,width,height,"combobox");
+	
+	this.width = width;
+	this.height = height;
+	
+	this.choices = choices;
+	this.onselect = onselect;
+	
+	this.selected_choice = "";
+	this.selected_textfield = new UITextField(this.width - height, height);
+	this.selected_textfield.onmouseclick = () => this.open_choices();
+	this.selected_textfield.onenter = () => this.handle_select(this.selected_textfield.getText());
+	this.addSubElement(this.selected_textfield,0,0);
+	/*
+	this.selected_label = new UILabel(this.selected_choice, "left");
+	this.addSubElement(this.selected_label,this.indent_size,this.indent_size);
+	*/
+	
+	this.select_button = new UIButton(height,height,"",()=>this.toggle_choices());
+	this.select_button.paint = function(context,x,y)
+	{
+		var direction = "north";
+		if(this.parent)
+		{
+			if(this.parent.choice_display.hidden)
+			{
+				direction = "south";
+			}
+		}
+		
+		UIDrawer.draw_arrow(context
+			,x + this.indent_size * 3
+			,y + this.indent_size * 2 + Math.round((this.height - this.indent_size * 4) / 4)
+			,this.width - this.indent_size * 6
+			,Math.round((this.height - this.indent_size * 4) / 2)
+			,direction);
+		context.fill();
+		context.stroke();
+	}
+	this.addSubElement(this.select_button,this.width - height,0);
+	
+	this.choice_display = new UIScrollPanel(this.x, this.y + this.height, this.width, this.height * this.choice_display_count, this.height * this.choices.length);
+	this.choice_display.hide();
+	this.addSubElement(this.choice_display, 0, this.height);
+	
+	this.choice_display_options = [];
+	this.close_onselect = true;
+	
+	this.resize(width,height);
+	this.set_choices(choices);
+}
+
+UIComboBox.prototype = Object.create(UIElement.prototype);
+Object.defineProperty(UIComboBox.prototype, 'constructor', {
+	value: UIComboBox,
+	enumerable: false, // so that it does not appear in 'for in' loop
+    writable: true });
+	
+UIComboBox.prototype.choice_display_count = 5;
+
+UIComboBox.prototype.resize = function(width, height)
+{
+	UIElement.prototype.resize.call(this, width, height);
+	this.normal_height = height;
+}
+
+UIComboBox.prototype.set_choices = function(choices)
+{
+	this.choices = choices;
+	this.prepare_choices();
+}
+
+UIComboBox.prototype.prepare_choices = function()
+{
+	// clean up!
+	this.choice_display_options.forEach(option => this.choice_display.removeSubElement(option));
+	this.choice_display_options = [];
+	
+	var count = 0;
+	this.choices.forEach(choice =>
+		{
+			var option = new UIComboBoxOption(this.choice_display.content_panel.width, this.normal_height,choice);
+			this.choice_display.addSubElement(option,0,count * this.normal_height);
+			this.choice_display_options.push(option);
+			count++;
+		});
+}
+
+UIComboBox.prototype.open_choices = function()
+{
+	UIElement.prototype.resize.call(this, this.width, this.normal_height * (1 + this.choice_display_count));
+	this.choice_display.show();
+}
+
+UIComboBox.prototype.close_choices = function()
+{
+	UIElement.prototype.resize.call(this, this.width, this.normal_height);
+	this.choice_display.hide();
+}
+
+UIComboBox.prototype.toggle_choices = function()
+{
+	if(this.choice_display.hidden) 
+	{
+		this.open_choices();
+		return;
+	}
+	else 
+	{
+		this.close_choices();
+	}
+}
+
+UIComboBox.prototype.handle_select = function(value)
+{
+	this.set_selected(value);
+	
+	if(this.close_onselect) this.close_choices();
+	if(this.onselect) this.onselect(value);
+}
+
+UIComboBox.prototype.set_selected = function(value)
+{
+	this.selected_choice = value;
+	
+	if(!value) this.selected_choice = "";
+	
+	this.selected_textfield.setText(this.selected_choice);
+}
+
+/**
+	A combobox option is a special type of UI Element (nah, it's just a highlightable)
+ */
+function UIComboBoxOption(width,height,text)
+{
+	UIElement.call(this,null,null,width,height,"combobox_option",()=>{this.handle_select()});
+	this.value = text;
+	this.label = new UILabel(text,"left");
+	this.addSubElement(this.label, this.indent_size, this.indent_size);
+}
+
+UIComboBoxOption.prototype = Object.create(UIElement.prototype);
+Object.defineProperty(UIComboBoxOption.prototype, 'constructor', {
+	value: UIComboBoxOption,
+	enumerable: false, // so that it does not appear in 'for in' loop
+    writable: true });
+	
+UIComboBoxOption.prototype.default_colour = UIElement.prototype.lighter_colour;	
+UIComboBoxOption.prototype.darker_colour = UIElement.prototype.default_colour;	
+	
+UIComboBoxOption.prototype.draw = function(context)
+{
+	if(this.hidden) return false;
+	
+	/* draw self */
+	context.fillStyle = this.default_colour;
+	context.strokeStyle = this.darker_colour;
+	context.lineWidth = this.line_width;
+	
+	// standard
+	context.beginPath();
+	context.rect(this.x, this.y, this.width, this.height);
+	context.closePath();
+	context.fill();
+	
+	this.draw_concave_indents(context);
+	
+	if(this.paint) this.paint(context,this.x,this.y);
+	
+	if(this.children)
+	{
+		var elements_to_draw = [...this.children].reverse();
+		elements_to_draw.forEach(element => element.draw(context));
+	}
+}
+	
+UIComboBoxOption.prototype.handle_select = function()
+{
+	var combobox = this.parent.parent.parent;
+	if(!combobox || !(combobox instanceof UIComboBox)){Engine.log(`UIComboBoxOption: Cannot find parent ComboBox.`); return}
+	
+	combobox.handle_select(this.value);
+}
+	
 // UI Drawer, which handles away all the common features to be drawn in terms of UI
 // this helps simplify the amount of 'context.lineTo()'s that we'll have to do
 var UIDrawer = (
@@ -1517,6 +1828,59 @@ var UIDrawer = (
 							context.fillText(text,x-textMetric.width/2,y+font_size/2);
 							break;
 				}
+			},
+			
+			// shapes! fun!
+			// directions: north, south, east, west
+			draw_arrow: function(context,x,y,width,height,direction="north")
+			{
+				context.beginPath();
+				switch(direction)
+				{
+					case "west": 
+						context.moveTo(x+width,y);
+						context.lineTo(x,y+height/2);
+						context.lineTo(x+width,y+height);
+						context.lineTo(x+width,y);
+						break;
+					case "east": 
+						context.moveTo(x,y);
+						context.lineTo(x+width,y+height/2);
+						context.lineTo(x,y+height);
+						context.lineTo(x,y);
+						break;
+					case "south":
+						context.moveTo(x,y);
+						context.lineTo(x+width/2,y+height);
+						context.lineTo(x+width,y);
+						context.lineTo(x,y);
+						break;
+					case "north":
+						context.moveTo(x+width,y+height);
+						context.lineTo(x+width/2,y);
+						context.lineTo(x,y+height);
+						context.lineTo(x+width,y+height);
+					default:
+				}
+				context.closePath();
+			},
+			
+			draw_diagonal_cross: function(context,x,y, width, height)
+			{
+				context.beginPath();
+				context.moveTo(x+width*(1/4),y+height*(0/4));
+				context.lineTo(x+width*(0/4),y+height*(1/4));
+				context.lineTo(x+width*(1/4),y+height*(2/4));
+				context.lineTo(x+width*(0/4),y+height*(3/4));
+				context.lineTo(x+width*(1/4),y+height*(4/4));
+				context.lineTo(x+width*(2/4),y+height*(3/4));
+				context.lineTo(x+width*(3/4),y+height*(4/4));
+				context.lineTo(x+width*(4/4),y+height*(3/4));
+				context.lineTo(x+width*(3/4),y+height*(2/4));
+				context.lineTo(x+width*(4/4),y+height*(1/4));
+				context.lineTo(x+width*(3/4),y+height*(0/4));
+				context.lineTo(x+width*(2/4),y+height*(1/4));
+				context.closePath();
 			},
 		}
 	}

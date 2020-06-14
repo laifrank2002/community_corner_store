@@ -31,6 +31,8 @@ Object.defineProperty(CheckoutCounter.prototype, 'constructor', {
 CheckoutCounter.prototype.template = {
 	key: "checkout_counter",
 	name: "Checkout Counter",
+	price: 500 * 100,
+	description: "Customers go here to pay you money.",
 	occupied: [{x:0,y:0},{x:1,y:0},{x:2,y:0}],
 	image: images["checkout_counter"],
 };

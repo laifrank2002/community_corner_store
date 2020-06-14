@@ -40,6 +40,7 @@ ShopInspectWindow.initialize = function()
 					this.setInput("0.00");
 				}
 			}),
+			/*
 		setItem: new UITextInput(250,25,"Set Item",
 			function()
 			{
@@ -69,6 +70,33 @@ ShopInspectWindow.initialize = function()
 					ShopInspectWindow.messageBox.setText(`Item not found. Check your spelling.`);
 				}
 			}),
+			*/
+		setItem: new UIComboBox(250,25,Object.keys(items).map(key => items[key].name),
+			function(value)
+			{
+				var item = items[findValueInPropertyInObject(items,"name",value)];
+				
+				if(item)
+				{
+					if(ShopInspectWindow.selectedObject instanceof Shelf)
+					{
+						var set_flag = ShopInspectWindow.selectedObject.setItem(item);
+						if(set_flag)
+						{
+							ShopInspectWindow.messageBox.setText(`Item set to ${item.name}.`);
+							ShopInspectWindow.update();
+						}
+						else 
+						{
+							ShopInspectWindow.messageBox.setText(`Item is already set to ${item.name}.`);
+						}
+					}
+				}
+				else 
+				{
+					ShopInspectWindow.messageBox.setText(`Item not found. Check your spelling.`);
+				}
+			}),
 	};
 	this.shelfDisplay.display.addSubElement(this.shelfDisplay.item,this.width/2,25);
 	this.shelfDisplay.display.addSubElement(this.shelfDisplay.price,25,50);
@@ -77,7 +105,6 @@ ShopInspectWindow.initialize = function()
 	this.shelfDisplay.display.addSubElement(this.shelfDisplay.setPrice,25,125);
 	this.shelfDisplay.display.addSubElement(this.shelfDisplay.setItem,25,160);
 	this.addSubElement(this.shelfDisplay.display, 0, 0);
-	
 	// checkout counter 
 	this.checkoutCounterDisplay = {
 			display: new UIPanel(null, null, this.width, this.content_panel.height - 25),
@@ -145,6 +172,7 @@ ShopInspectWindow.update = function()
 			this.shelfDisplay.price.setText(`Price: ${toCurrencyDisplayString(object.price)}`);
 			this.shelfDisplay.count.setText(`Count: ${object.count}`);
 			this.shelfDisplay.soldCount.setText(`Items Sold: ${object.itemTakenCount}`);
+			this.shelfDisplay.setItem.set_selected(item.name);
 		}
 		this.shelfDisplay.display.show();
 	}

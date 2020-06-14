@@ -27,10 +27,34 @@ function findPropertyInObject(object, property)
 }
 
 /**
-	Checks if two objects are equals deeply
-	That means we check each property recursively. Yum!
- */
-function compareObjectDeepEquals(left, right)
-{
+	Double reverses dictionaries.
+	Returns the first key of the first key that contains an object of a property 
+	that equals some value.
 	
+	ie,
+	
+	{
+		'key': {
+			'property': value
+		}
+	}
+	
+	searches WITHIN each object until object[key][property] === value 
+	
+	@date 2020-05-26
+	@author laifrank2002
+	
+	@return the first key of which this defined property contains some such value, or undefined if it doesn't exist.
+ */
+function findValueInPropertyInObject(object,property,value)
+{
+	for(var key in object)
+	{
+		if(object[key][property] === value)
+		{
+			return key;
+		}
+	}
+	
+	return undefined;
 }

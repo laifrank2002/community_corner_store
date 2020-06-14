@@ -23,6 +23,10 @@ var Shop = (
 		// these are NOT saved, and are typically temporary variables.
 		// UI
 		var newDayButton;
+		var openBuildModeButton;
+		
+		var buildModePalette;
+		var buildModePaletteDisplays;
 		
 		var speed = 1;
 		var paused = true;
@@ -30,7 +34,12 @@ var Shop = (
 		var time_elapsed = 0;
 		
 		var build_mode = false;
-		var build_mode_item_selected = 0;
+		var build_mode_item_selected = null;
+		var tile_selected = null;
+		var plop_okay = false;
+		
+		// daily stats 
+		var daily_stats = {};
 		
 		// DEBUG
 		var autonewday = true; // leaving it on AFK to see what would happen
@@ -41,25 +50,60 @@ var Shop = (
 			
 			get day_in_progress() {return day_in_progress},
 			
+			// tmp
+			set autonewday (value) {autonewday = value},
+			
 			initialize: function()
 			{
 				// data
 				map = State_manager.get_state("shop","map");
-				checkouts = State_manager.get_state("shop","checkouts");
-				shelves = State_manager.get_state("shop","shelves");
-				employees = State_manager.get_state("shop","employees");
-				customers = State_manager.get_state("shop","customers");
 				
 				// initialization
-				map = new Map(images["background1"],1600,1200,20,1);
+				map = new Map(images["background1"],1600,1200,18,1);
 				map.setViewportCoordinates(STARTING_X, STARTING_Y);
 				
+				// UI 
 				ShopElement.initialize();
-				// ui
 				newDayButton = new UIButton(200,25,"New Day",Shop.startNewDay);
 				ShopElement.addSubElement(newDayButton, ShopElement.width/2 - newDayButton.width/2, 20);
 				
+				openBuildModeButton = new UIButton(50,50,"",Shop.startBuildMode);
+				ShopElement.addSubElement(openBuildModeButton,25,25);
 				
+				buildModePalette = new UIWindow(400,10,300,400,"Build Mode",true,true);
+				ShopElement.addSubElement(buildModePalette, 400, 10);
+				buildModePalette.onhide = Shop.endBuildMode;
+				buildModePalette.hide();
+				
+				var buildModeScroll = new UIScrollPanel(null,null,buildModePalette.width,buildModePalette.content_panel.height-25,buildModePalette.height);
+				buildModePalette.addSubElement(buildModeScroll);
+				
+				buildModePaletteDisplays = [];
+				for(var key in FurnitureTemplateList)
+				{
+					var template = FurnitureTemplateList[key].prototype.template;
+					
+					var display = new UIPanel(null,null,buildModeScroll.content_panel.width,200);
+					
+					var displayImage = new UIImage(160,160,template.image, "vertical");
+					display.addSubElement(displayImage, 20, 20);
+					
+					var image_offset = 150;
+					
+					var displayTitle = new UILabel(template.name, "left");
+					display.addSubElement(displayTitle, image_offset, 10);
+					var displayPrice = new UILabel(`Price:  ${toCurrencyDisplayString(template.price)}`, "left");
+					display.addSubElement(displayPrice, image_offset,30); 
+					var displayDescription = new UITextArea(display.width - image_offset, 100, template.description);
+					display.addSubElement(displayDescription, image_offset, 50);
+					var displayBuy = new UIButton(100,25,"Build",function(){Shop.setBuildModePaletteSelected(this.key)});
+					displayBuy.key = key;
+					display.addSubElement(displayBuy,image_offset + (display.width-image_offset-displayBuy.width)/2,160);
+					
+					buildModeScroll.addSubElement(display,0,buildModePaletteDisplays.length * display.height);
+					buildModePaletteDisplays.push({display:display, price: displayPrice, title: displayTitle, description: displayDescription, buy: displayBuy});
+				}
+				buildModeScroll.resizeMaxHeight(buildModePaletteDisplays.length * 200);
 				// state manager
 				
 				// da testing 
@@ -82,24 +126,26 @@ var Shop = (
 				
 				Shop.plopGridObject(new CheckoutCounter(),1,0);
 				
-				// Shop.startNewDay();
+				Shop.startBuildMode();
 			},
 			
 			fromData: function(data)
 			{
 				// turns data into something useful
 				map = new Map();
-				map = map.fromData(data.map);
+				map.fromData(data.map);
 				
 				employees = data.employees.map(datum => 
 				{
 					var employee = new Employee();
 					employee.fromData(datum);
+					return employee;
 				});
 				customers = data.customers.map(datum => 
 				{
 					var customer = new Customer();
 					customer.fromData(datum);
+					return customer;
 				});
 				
 				// we gotta refind our shelves and checkouts cause it turns out that JSON can't store references 
@@ -114,9 +160,9 @@ var Shop = (
 			{
 				// turns this into data
 				return {
-					map: map,
-					employees: employees,
-					customers: customers,
+					map: map.toData(),
+					employees: employees.map(employee => employee.toData()),
+					customers: customers.map(customer => customer.toData()),
 				}
 			},
 			
@@ -133,11 +179,29 @@ var Shop = (
 					return;
 				}
 				
+				daily_stats["sales_count"] = 0;
+				daily_stats["sales_value"] = 0;
+				daily_stats["customers"] = 0;
+				daily_stats["money"] = State_manager.get_state("player","money");
+				
+				// il faut que we create a new object because the previous one will have been saved to history, and we CAN'T CHANGE HISTORY!
+				daily_stats["item_breakdown"] = {};
+				for(var key in items)
+				{
+					daily_stats["item_breakdown"][key] = {
+						demand: 0,
+						sales_count: 0,
+						profit_value: 0,
+						sales_value: 0,
+					}
+				}
+				
 				newDayButton.hide();
 				// we respawn the employees 
 				employees.forEach(employee => 
 				map.spawnAgent(employee));
 				
+				Shop.endBuildMode();
 				Shop.unpause();
 				day_in_progress = true;
 				State_manager.add_state("world","day",1);
@@ -185,6 +249,9 @@ var Shop = (
 				// now we run payroll
 				employees.forEach(employee => State_manager.add_state("player","money",-employee.salary));
 				
+				// and furthermore, we now write to history all of our statistics
+				Shop.saveDayToHistory();
+				
 				if(autonewday)
 				{
 					Shop.startNewDay();
@@ -193,6 +260,28 @@ var Shop = (
 				{
 					newDayButton.show();
 				}
+			},
+			
+			// saved at the end of each day; takes things that we want a permanent record of.
+			saveDayToHistory: function()
+			{				
+				History.addDay(daily_stats);
+			},
+			
+			startBuildMode: function()
+			{
+				buildModePalette.show();
+				build_mode = true;
+			},
+			
+			endBuildMode: function()
+			{
+				// we reset everything 
+				if(!buildModePalette.hidden)buildModePalette.hide();
+				build_mode = false;
+				build_mode_item_selected = null;
+				tile_selected = null;
+				plop_okay = false;
 			},
 			
 			pause: function()
@@ -213,6 +302,11 @@ var Shop = (
 			spawnCustomer: function(customer)
 			{
 				map.spawnAgent(customer);
+				daily_stats["customers"]++;
+				
+				// calculate demands based on needs
+				// we need to do this after spawning since that is what initializes needs
+				customer.needs.forEach(need => daily_stats["item_breakdown"][need.key].demand++);
 			},
 			// this is used when a customer leaves the store 
 			// and has completed purchase and everything.
@@ -229,6 +323,9 @@ var Shop = (
 					State_manager.add_state("statistics","total_sales_value",customer.subtotal);
 					State_manager.add_state("statistics","total_sales_tax",customer.subtotal*World.sales_tax);
 					
+					daily_stats["sales_count"]++;
+					daily_stats["sales_value"]+=customer.subtotal;
+					
 					// now we must perform its effects
 					customer.cart.forEach(item =>
 					{
@@ -238,6 +335,10 @@ var Shop = (
 						}
 						
 						// and stats!
+						daily_stats["item_breakdown"][item.key].sales_count++;
+						daily_stats["item_breakdown"][item.key].sales_value+=item.price; // this is NOT the default price but a different price set from the customer side.
+						daily_stats["item_breakdown"][item.key].profit_value+=item.price-Stock.getAverageCost(item.key);
+						
 						State_manager.add_state("statistics",`total_${item.key}_sales_value`,item.price);
 						State_manager.add_state("statistics",`total_${item.key}_sales_count`,1);
 					});
@@ -262,10 +363,71 @@ var Shop = (
 				});
 			},
 			
+			spawnParticle: function(particle)
+			{
+				map.spawnParticle(particle);
+			},
+			
 			draw: function(context,x,y)
 			{
-				if(map) map.draw(context,x,y);
+				// keys 
+				// deal with engine and keys first 
 				
+				var keysPressed = Engine.keysPressed;
+				if(keysPressed.up)
+				{
+					map.viewport.move(0,-map.KEY_MOVEMENT_SPEED);
+				}
+				if(keysPressed.down)
+				{
+					map.viewport.move(0,map.KEY_MOVEMENT_SPEED);
+				}
+				if(keysPressed.left)
+				{
+					map.viewport.move(-map.KEY_MOVEMENT_SPEED,0);
+				}
+				if(keysPressed.right)
+				{
+					map.viewport.move(map.KEY_MOVEMENT_SPEED,0);
+				}
+				
+				map.restituteViewport();
+				
+				// draw the map and constituents
+				if(map) 
+				{
+					map.draw(context,x,y);
+					
+					var internal_coordinates = Shop.getInternalCoordinatesFromMouseCoordinates(Engine.mouseX, Engine.mouseY);
+					var new_tile_selected = Shop.getTileAt(internal_coordinates.x, internal_coordinates.y);
+					// verify once to save calculation time
+					if(new_tile_selected !== tile_selected) 
+					{
+						tile_selected = new_tile_selected;
+						if(build_mode_item_selected)
+						{
+							if(tile_selected)
+							{
+								plop_okay = map.grid.isObjectPloppableAt(build_mode_item_selected, tile_selected.x, tile_selected.y);
+							}
+						}
+					}
+							
+					if(build_mode_item_selected)
+					{
+						if(tile_selected && plop_okay)
+						{
+							var tile_x = tile_selected.x * map.GRID_HORIZONTAL_SIZE + map.GRID_STARTING_X;
+							var tile_y = -tile_selected.y * map.GRID_VERTICAL_SIZE + map.GRID_STARTING_Y;
+							
+							build_mode_item_selected.drawGhost(context, tile_x + x - map.viewport.x, tile_y + y - map.viewport.y);
+						}
+						else 
+						{
+							build_mode_item_selected.drawGhost(context, Engine.mouseX, Engine.mouseY);
+						}
+					}
+				}
 				// data overlays 
 				
 				// time 
@@ -298,7 +460,49 @@ var Shop = (
 				// temp spawn algorithmn
 				if(time_elapsed/LENGTH_OF_DAY < 0.7)
 				{
-					if(Math.random() < 0.01) map.spawnAgent(Shop.generateCustomer());
+					if(Math.random() < 0.01) Shop.spawnCustomer(Shop.generateCustomer());
+				}
+			},
+			
+			onmouseclick: function(mouseX, mouseY)
+			{
+				var point = Shop.getInternalCoordinatesFromMouseCoordinates(mouseX, mouseY);
+				var tile = Shop.getTileAt(point.x,point.y);
+				var selectedObject = Shop.getObjectAt(point.x,point.y);
+				
+				if(build_mode)
+				{
+					if(build_mode_item_selected && tile)
+					{
+						if(Shop.plopGridObject(build_mode_item_selected, tile.x, tile.y))
+						{
+							build_mode_item_selected = null;
+							
+							// if SHIFT option
+							// FLAG
+						}
+						else 
+						{
+							build_mode_item_selected = null;
+						}
+					}
+					else 
+					{
+						build_mode_item_selected = null;
+						Shop.endBuildMode();
+					}
+				}
+				else 
+				{
+					if(selectedObject)
+					{
+						ShopInspectWindow.prepare(selectedObject);
+						ShopInspectWindow.show();
+					}
+					else 
+					{
+						ShopInspectWindow.hide();
+					}
 				}
 			},
 			
@@ -407,6 +611,13 @@ var Shop = (
 				return selected;
 			},
 			
+			getTileAt: function(x,y)
+			{
+				if(!map) return null;
+				
+				return map.getTileAtCoordinates(x,y);
+			},
+			
 			getInternalCoordinatesFromMouseCoordinates: function(mouseX,mouseY)
 			{
 				return {x: mouseX - ShopElement.x + map.viewport.x, y: mouseY - ShopElement.y + map.viewport.y};
@@ -485,6 +696,15 @@ var Shop = (
 			{
 				return Stock.setTargetCount(key, amount);
 			},
+			
+			setBuildModePaletteSelected: function(selected)
+			{
+				if(FurnitureTemplateList[selected])
+				{
+					build_mode_item_selected = new FurnitureTemplateList[selected]();
+				}
+			},
+			
 		}
 	}
 )();

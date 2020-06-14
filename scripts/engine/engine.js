@@ -65,6 +65,8 @@ var Engine = (
 				document.body.addEventListener("keydown",Engine.handle_keydown, false);
 				document.body.addEventListener("keyup",Engine.handle_keyup, false);
 				
+				document.body.addEventListener("wheel",Engine.handle_wheel, false);
+				
 				if(_debug)
 				{
 					Engine.log("Debug mode enabled!");
@@ -220,6 +222,11 @@ var Engine = (
 						keysPressed["up"] = false;
 						break;
 				}
+			},
+			
+			handle_wheel: function(wheelevent)
+			{
+				UIHandler.handle_wheel(wheelevent.deltaY);
 			},
 		}
 	}

@@ -3,11 +3,13 @@
 	A reminder to please only save AT THE END OF A TICK.
 	Stores 
 		- User Data
+		
+	When adding categories, check that they will be parsed in import/export too!
  */
 var State_manager = (
 	function()
 	{
-		var categories = ["shop","player","world","community","statistics","settings"];
+		var categories = ["shop","stock","player","world","community","statistics","settings"];
 		var data = {};
 		var listeners = [];
 		
@@ -47,13 +49,13 @@ var State_manager = (
 				};
 				data["shop"] = {
 					"map": new Map(create_image("assets/background1.png"),1600,1200,10,1),
-					"checkouts": [],
-					"shelves": [],
-					"employees": [],
-					"customers": [],
-					"stock": {},
 				};
-				data["world"] = World;
+				data["stock"] = {"inventory":{}};
+				data["world"] = {
+					sales_tax: 0.13,
+					day: 0,
+					prices: {},
+				};
 				for(var key in items)
 				{
 					var item = items[key];
@@ -70,6 +72,7 @@ var State_manager = (
 					"customers_left_without_buying": 0,
 					"total_sales_value": 0,
 					"total_sales_tax": 0,
+					"history": [],
 				};
 				
 				for(var key in items)
@@ -105,6 +108,13 @@ var State_manager = (
 					{
 						State_manager.set_state(category,id
 							,State_manager.get_state(category,id) + value);
+					}
+					else if(Array.isArray(data[category][id]))
+					{
+						State_manager.get_state(category,id).push(value);
+						// we need the listeners attached to trigger, so we call a redundancy
+						State_manager.set_state(category,id
+							,State_manager.get_state(category,id));
 					}
 				}
 				else 
@@ -145,10 +155,21 @@ var State_manager = (
 			
 			export_data: function()
 			{
-				Engine.log("Stringifying data for pasta... ");
+				Engine.log("Stringifying data for pasta-ing... ");
+				
 				try 
 				{
-					return JSON.stringify(data);
+					var dataToExport = {};
+					dataToExport["shop"] = Shop.toData();
+					dataToExport["stock"] = data["stock"];
+					dataToExport["player"] = data["player"];
+					dataToExport["world"] = data["world"];
+					dataToExport["community"] = data["community"];
+					dataToExport["statistics"] = data["statistics"];
+					dataToExport["settings"] = data["settings"];
+					
+					return JSON.stringify(dataToExport);
+					
 				}
 				catch(exception)
 				{
@@ -176,7 +197,19 @@ var State_manager = (
 					Engine.log(`Pasta ${key} is being added`);
 					// this will add unnecessary info, but that's fine. What's important is that we get the right initializations in.
 					data[key] = imported_data[key];
+					
+					if(key === "shop")
+					{
+						Shop.fromData(imported_data[key]);
+						data[key] = {map:Shop.map};
+					}
+					else 
+					{
+						data[key] = imported_data[key];
+					}
 				}
+				
+				Stock.updateDisplays();
 			},
 			
 			load: function()

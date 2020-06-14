@@ -48,7 +48,7 @@ var UIHandler = (
 				tabs.addSubPanel("Stock",stock_tab);
 				
 				var reports_tab = ReportsElement;
-				tabs.addSubPanel("Reports",reports_tab);
+				tabs.addSubPanel("Reports",reports_tab,Reports.onOpen);
 				
 				var settings_tab = new UIPanel();
 				tabs.addSubPanel("Settings",settings_tab);
@@ -110,7 +110,18 @@ var UIHandler = (
 				{
 					if(ui[uielement].handle_keyup(character))
 					{
-						
+						// do nothing
+					}
+				}
+			},
+			
+			handle_wheel: function(deltaY)
+			{
+				for(uielement in ui)
+				{
+					if(ui[uielement].handle_wheel(deltaY))
+					{
+						// do nothing
 					}
 				}
 			},

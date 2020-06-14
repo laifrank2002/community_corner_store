@@ -165,38 +165,18 @@ Grid.prototype.getFloor = function(y)
 
 Grid.prototype.plopGridObject = function(object, x, y)
 {
-	// validate first to save time and prevent errors
-	if(x < 0 || x + object.gridWidth > this.width || y < 0 || y + object.gridHeight > this.height)
+	if(this.isObjectPloppableAt(object,x,y))
 	{
-		Engine.log(`Grid: plop out of bounds at (${x},${y}).`);
-		return false;
-	}
-	
-	// for special cases
-	if(object.plopValidationFunction)
-	{
-		if(!object.plopValidationFunction(this, x, y))
-		{
-			Engine.log(`Grid: Unable to unplop, validation function failed.`);
-			return false;
-		}
-	}
-	
-	var occupiedCoordinates = this.translateCoordinates(object.template.occupied, x, y);
-	var occupiedTiles = occupiedCoordinates.map(coordinate => this.getTile(coordinate.x,coordinate.y));
-	
-	if(this.isAllValidTile(occupiedTiles,(tile) => object.isValidTile(tile)))
-	{
+		var occupiedCoordinates = this.translateCoordinates(object.template.occupied, x, y);
+		var occupiedTiles = occupiedCoordinates.map(coordinate => this.getTile(coordinate.x,coordinate.y));
+		
 		occupiedTiles.forEach(tile => tile.isOccupied = true);
 		object.plop(x,y);
 		return true;
 	}
-	else 
-	{
-		// log it to the dev 
-		Engine.log(`Grid: Unable to plop at (${x},${y}), already occupied.`);
-		return false;
-	}
+	
+	Engine.log(`Grid: Unable to plop at ${x},${y}.`);
+	return false;
 }
 
 Grid.prototype.unplopGridObject = function(object)
@@ -221,6 +201,37 @@ Grid.prototype.isAllValidTile = function(tileList,validationFunction)
 	tileList.forEach(tile => {if(!validationFunction(tile)) allValid = false});
 	
 	return allValid;
+}
+
+Grid.prototype.isObjectPloppableAt = function(object,x,y)
+{
+	// validate first to save time and prevent errors
+	if(x < 0 || x + object.gridWidth > this.width || y < 0 || y + object.gridHeight > this.height)
+	{
+		return false;
+	}
+	
+	// for special cases
+	if(object.plopValidationFunction)
+	{
+		if(!object.plopValidationFunction(this, x, y))
+		{
+			Engine.log(`Grid: Unable to unplop, validation function failed.`);
+			return false;
+		}
+	}
+	
+	var occupiedCoordinates = this.translateCoordinates(object.template.occupied, x, y);
+	var occupiedTiles = occupiedCoordinates.map(coordinate => this.getTile(coordinate.x,coordinate.y));
+	
+	if(this.isAllValidTile(occupiedTiles,(tile) => object.isValidTile(tile)))
+	{
+		return true;
+	}
+	else 
+	{
+		return false;
+	}
 }
 
 /**

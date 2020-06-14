@@ -1,6 +1,6 @@
 /**
 	A map object which performs the drawing options of the shop.
-	Used by the shop.
+	This is a HYBRID of a COMPONENT and a MODEL.
 	
 	Performs the following functions 
 		- Background
@@ -44,7 +44,7 @@ function Map(image, width, height, grid_width = Map.prototype.GRID_HORIZONTAL_WI
 }
 
 Map.prototype.KEY_MOVEMENT_SPEED = 10;
-Map.prototype.GRID_STARTING_X = 64;
+Map.prototype.GRID_STARTING_X = 128;
 Map.prototype.GRID_STARTING_Y = 880;
 
 Map.prototype.GRID_HORIZONTAL_WIDTH = 21;
@@ -80,6 +80,8 @@ Map.prototype.toData = function()
 		grid: this.grid.toData(),
 		objects: this.objects.map(object => object.toData()),
 	};
+	
+	return data;
 }
 
 /**
@@ -144,26 +146,6 @@ Map.prototype.fromData = function(data)
 
 Map.prototype.draw = function(context, x, y)
 {
-	// deal with engine and keys first 
-	var keysPressed = Engine.keysPressed;
-	if(keysPressed.up)
-	{
-		this.viewport.move(0,-this.KEY_MOVEMENT_SPEED);
-	}
-	if(keysPressed.down)
-	{
-		this.viewport.move(0,this.KEY_MOVEMENT_SPEED);
-	}
-	if(keysPressed.left)
-	{
-		this.viewport.move(-this.KEY_MOVEMENT_SPEED,0);
-	}
-	if(keysPressed.right)
-	{
-		this.viewport.move(this.KEY_MOVEMENT_SPEED,0);
-	}
-	this.restituteViewport();
-	
 	if(this.backgroundImage)
 	{
 		context.drawImage(this.backgroundImage
@@ -273,4 +255,27 @@ Map.prototype.tick = function(lapse)
 	{
 		this.objects[index].tick(lapse);
 	}
+}
+
+// from mouse coordinates determines where the tile's at.
+Map.prototype.getTileAtCoordinates = function(mouseX, mouseY)
+{
+	// ZOOM FLAG
+	// Y-REVERSE FLAG
+	/*
+		We must undo two offsets
+			viewport offset 
+			grid offset
+		And for the Y, we must undo the reversy thing.
+		
+		The reason we don't delegate to the grid 
+		is because MAP handles rendering and TILE SIZEs.
+		So we can resolve everything with a simple formula!
+	 */
+	var x = Math.floor((mouseX - this.GRID_STARTING_X) / this.GRID_HORIZONTAL_SIZE);
+	var y = Math.floor(-((mouseY - this.GRID_STARTING_Y) / this.GRID_VERTICAL_SIZE));
+	
+	if(x < 0 || y < 0 || x >= this.grid.width || y >= this.grid.height) return null;
+	
+	return this.grid.getTile(x,y);
 }

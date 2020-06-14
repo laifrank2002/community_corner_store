@@ -30,6 +30,8 @@ Object.defineProperty(Shelf.prototype, 'constructor', {
 Shelf.prototype.template = {
 	key: "shelf",
 	name: "Shelf",
+	price: 100 * 100,
+	description: "Holds many things. \n \nCapacity: 20",
 	occupied: [{x:0,y:0},{x:1,y:0}],
 	image: images["shelf"],
 	frames: {
@@ -71,7 +73,7 @@ Shelf.prototype.toData = function()
 Shelf.prototype.fromData = function(data)
 {
 	// in case the shelf actually has no item set (it's possible.)
-	this.item = data.itemKey === "" ? items[data.itemKey] : null; 
+	this.item = data.itemKey !== "" ? items[data.itemKey] : null; 
 	if(!this.item) Engine.log(`Shelf.fromData() cannot find item of key ${data.itemKey}.`);
 	
 	this.price = data.price;
@@ -146,12 +148,20 @@ Shelf.prototype.stock = function(amount = this.capacity)
 	return amount;
 }
 
+Shelf.prototype.isEmpty = function()
+{
+	// we don't count -1 because that is reserved as a special flag.
+	if(this.count === 0) return true;
+}
+
 Shelf.prototype.setItem = function(item)
 {
 	// sanity check first to ensure that we aren't magically converting lead into gold 
 	// if only...
 	if(this.item)
 	{
+		// on the other hand, but sometimes it's the same. so we pretend nothing happens.
+		if(this.item === item) return false;
 		Shop.returnStock(this.item.key,this.count);
 		this.count = 0;
 		// we can't compare apples to oranges
@@ -161,6 +171,7 @@ Shelf.prototype.setItem = function(item)
 	this.item = item;
 	// default is 100% markup of DEFAULT, not current price.
 	this.setPrice(item.buy_price.start * 2.0);
+	return true;
 }
 
 Shelf.prototype.setPrice = function(price)

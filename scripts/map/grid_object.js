@@ -100,6 +100,17 @@ GridObject.prototype.draw = function(context,x,y)
 	}
 }
 
+/**
+	@overrides MapObject.prototype.drawGhost(context,x,y)
+ */
+GridObject.prototype.drawGhost = function(context,x,y)
+{
+	this.x = x;
+	this.y = y - this.height;
+	
+	MapObject.prototype.drawGhost.call(this,context,0,0);
+}
+
 GridObject.prototype.plop = function(x,y)
 {
 	if(this.plopped)

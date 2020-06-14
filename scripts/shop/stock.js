@@ -17,7 +17,7 @@ var Stock = (
 		return {
 			initialize: function()
 			{
-				inventory = State_manager.get_state("shop","stock");
+				inventory = State_manager.get_state("stock","inventory");
 				
 				for(var key in items)
 				{
@@ -90,20 +90,20 @@ var Stock = (
 			updateDisplay: function(key)
 			{
 				var display = displays[key];
-				display.count.setText(`Count: ${inventory[key].count}`);
-				display.averageCost.setText(`Average Cost:  ${toCurrencyDisplayString(inventory[key].average_cost)}`);
+				display.count.setText(`Count: ${State_manager.get_state("stock","inventory")[key].count}`);
+				display.averageCost.setText(`Average Cost:  ${toCurrencyDisplayString(State_manager.get_state("stock","inventory")[key].average_cost)}`);
 				display.worldPrice.setText(`Price: ${toCurrencyDisplayString(World.prices[key].wholesale)}`);
 			},
 			
 			getItem: function(key)
 			{
-				if(!inventory[key])
+				if(!State_manager.get_state("stock","inventory")[key])
 				{
 					Engine.log(`Stock.getItem: ${key} does not exist. All inventory are defined in inventory. Check the keys too.`);
 					return null;
 				}
 				
-				return inventory[key];
+				return State_manager.get_state("stock","inventory")[key];
 			},
 			
 			getCount: function(key)
@@ -158,7 +158,7 @@ var Stock = (
 				// sanity check 
 				// REMINDER, since 0 is autocast, when we set to 0 again it should do nothing.
 				// if using a different default value, be wary.
-				if(!item.averageCost) item.average_cost = 0;
+				if(!item.average_cost) item.average_cost = 0;
 				
 				item.count += count;
 				

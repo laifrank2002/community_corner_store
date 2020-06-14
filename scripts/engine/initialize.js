@@ -14,5 +14,6 @@ window.onload = function()
 	Engine.initialize();
 	Stock.initialize();
 	Shop.initialize();
+	History.initialize();
 	Reports.initialize();
 }

@@ -22,27 +22,11 @@ ShopElement.paint = function(context)
 	Shop.draw(context, this.x, this.y);
 }
 
-ShopElement.onmousedown = function(mouseX, mouseY)
-{
-	var point = Shop.getInternalCoordinatesFromMouseCoordinates(mouseX, mouseY);
-	var selected = Shop.getObjectAt(point.x,point.y);
-	if(selected)
-	{
-		ShopInspectWindow.prepare(selected);
-		ShopInspectWindow.show();
-	}
-	else 
-	{
-		ShopInspectWindow.hide();
-	}
-}
+ShopElement.onmousedown = function(mouseX, mouseY){}
 
-ShopElement.onmouseup = function(mouseX, mouseY)
-{
-	
-}
+ShopElement.onmouseup = function(mouseX, mouseY){}
 
 ShopElement.onmouseclick = function(mouseX, mouseY)
 {
-	
+	Shop.onmouseclick(mouseX, mouseY);
 }

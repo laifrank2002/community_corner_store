@@ -21,6 +21,8 @@ Object.defineProperty(NarrowShelf.prototype, 'constructor', {
 NarrowShelf.prototype.template = {
 	key: "narrow_shelf",
 	name: "Narrow Shelf",
+	price: 50 * 100,
+	description: "A smaller shelf for one's needs. \n \nCapacity: 8",
 	occupied: [{x:0,y:0}],
 	image: images["narrow_shelf"],
 	frames: {

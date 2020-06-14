@@ -376,6 +376,11 @@ Customer.prototype.browseShelf = function(shelf)
 {
 	var item = shelf.browse();
 	var price = shelf.price;
+	// if there is no item, we can't buy it, simple enuff
+	if(!item) return;
+	// also if the shelf's empty that's a problem too
+	if(shelf.isEmpty()) return;
+	
 	// buying logic, for now it's random.
 	if(Math.random() < this.determineBuyChance(item, price))
 	{
